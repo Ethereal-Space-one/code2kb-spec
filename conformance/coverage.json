@@ -81,8 +81,8 @@
       "validation/tests/test_knowledge.py::KnowledgeTests.test_single_backend_with_event_entry_and_method_catalog"
     ],
     "C2KB-EXT-006": [
-      "conformance/compatibility-statement.template.json",
-      "docs/conformance.md"
+      "validation/tests/test_conformance.py::ConformanceTests.test_report_matches_checked_in_expectation",
+      "conformance/compatibility-statement.template.json"
     ],
     "C2KB-META-001": [
       "validation/tests/test_knowledge.py::KnowledgeTests.test_config_rejects_unknown_and_duplicate_fields",
@@ -160,16 +160,16 @@
       "validation/tests/test_governance.py::GovernanceTests.test_policy_review_requires_external_report_when_policy_requests_it"
     ],
     "C2KB-ROLE-001": [
-      "docs/conformance.md"
+      "validation/tests/test_knowledge.py::KnowledgeTests.test_publish_isolated_views_and_no_overwrite"
     ],
     "C2KB-ROLE-002": [
-      "docs/conformance.md"
+      "validation/tests/test_knowledge.py::KnowledgeTests.test_publish_isolated_views_and_no_overwrite"
     ],
     "C2KB-ROLE-003": [
-      "docs/conformance.md"
+      "validation/tests/test_knowledge.py::KnowledgeTests.test_publish_isolated_views_and_no_overwrite"
     ],
     "C2KB-ROLE-004": [
-      "docs/conformance.md"
+      "validation/tests/test_knowledge.py::KnowledgeTests.test_publish_isolated_views_and_no_overwrite"
     ],
     "C2KB-VIEW-001": [
       "validation/tests/test_knowledge.py::KnowledgeTests.test_publish_isolated_views_and_no_overwrite"

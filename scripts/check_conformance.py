@@ -53,7 +53,14 @@ def validate_reference(reference: str) -> None:
         raise ConformanceError("覆盖引用必须是非空字符串")
     local, separator, selector = reference.partition("::")
     path = ROOT / local
-    if Path(local).is_absolute() or ".." in Path(local).parts or not path.is_file():
+    parts = Path(local).parts
+    if (
+        Path(local).is_absolute()
+        or ".." in parts
+        or not parts
+        or parts[0] not in {"validation", "conformance", "examples"}
+        or not path.is_file()
+    ):
         raise ConformanceError(f"覆盖引用文件不存在或越界：{reference}")
     if separator:
         if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*\.[A-Za-z_][A-Za-z0-9_]*", selector):
