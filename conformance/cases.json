@@ -1,0 +1,25 @@
+{
+  "schema_version": "1.0",
+  "cases": [
+    {
+      "case_id": "config-minimal-valid",
+      "kind": "project_config",
+      "file": "valid/minimal-config.json",
+      "expected": "valid"
+    },
+    {
+      "case_id": "config-unsafe-environment-expression",
+      "kind": "project_config",
+      "file": "invalid/unsafe-environment-path.json",
+      "expected": "invalid",
+      "error_contains": "只支持绝对路径或完整的"
+    },
+    {
+      "case_id": "config-duplicate-top-level-field",
+      "kind": "project_config",
+      "file": "invalid/duplicate-standard-version.json",
+      "expected": "invalid",
+      "error_contains": "重复字段"
+    }
+  ]
+}

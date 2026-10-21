@@ -1,0 +1,20 @@
+{
+  "schema_version": "1.0",
+  "implementation": {
+    "name": "replace-with-implementation-name",
+    "version": "0.0.0",
+    "language": "replace-with-language"
+  },
+  "spec_version": "0.8.3",
+  "roles": ["Validator"],
+  "requirements": {
+    "covered": ["C2KB-META-001"],
+    "not_covered": []
+  },
+  "conformance_report": {
+    "fixture_revision": "replace-with-git-commit",
+    "status": "passed",
+    "report_sha256": "replace-with-sha256"
+  },
+  "limitations": ["Describe behavior that remains outside the claim."]
+}

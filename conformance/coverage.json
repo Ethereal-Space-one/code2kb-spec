@@ -1,0 +1,193 @@
+{
+  "schema_version": "1.0",
+  "spec_version": "0.8.3",
+  "requirements": {
+    "C2KB-BASE-001": [
+      "examples/create_demo.py"
+    ],
+    "C2KB-BASE-002": [
+      "examples/create_demo.py"
+    ],
+    "C2KB-BASE-003": [
+      "examples/create_demo.py"
+    ],
+    "C2KB-BASE-004": [
+      "examples/create_demo.py"
+    ],
+    "C2KB-BASE-005": [
+      "examples/create_demo.py"
+    ],
+    "C2KB-CONSISTENCY-001": [
+      "validation/tests/test_knowledge.py::KnowledgeTests.test_configured_coverage_terms_are_enforced"
+    ],
+    "C2KB-CONSISTENCY-002": [
+      "validation/tests/test_knowledge.py::KnowledgeTests.test_publish_requires_four_qa_passes"
+    ],
+    "C2KB-CONSISTENCY-003": [
+      "validation/tests/test_governance.py::GovernanceTests.test_changed_fact_reports_affected_file"
+    ],
+    "C2KB-CONSISTENCY-004": [
+      "validation/tests/test_knowledge.py::KnowledgeTests.test_semantic_quality_rejects_missing_field_closure"
+    ],
+    "C2KB-CONSISTENCY-005": [
+      "validation/tests/test_knowledge.py::KnowledgeTests.test_semantic_quality_rejects_missing_field_closure"
+    ],
+    "C2KB-CONSISTENCY-006": [
+      "validation/tests/test_knowledge.py::KnowledgeTests.test_semantic_quality_rejects_failed_cross_document_review"
+    ],
+    "C2KB-CONSISTENCY-007": [
+      "validation/tests/test_knowledge.py::KnowledgeTests.test_semantic_quality_is_optional_and_reports_counts_when_enabled"
+    ],
+    "C2KB-EVIDENCE-001": [
+      "validation/tests/test_governance.py::GovernanceTests.test_runtime_claim_requires_registered_evidence"
+    ],
+    "C2KB-EVIDENCE-002": [
+      "validation/tests/test_governance.py::GovernanceTests.test_static_matching_does_not_prove_deployment"
+    ],
+    "C2KB-EVIDENCE-003": [
+      "validation/tests/test_governance.py::GovernanceTests.test_valid_runtime_evidence_can_be_published_in_limited_scope"
+    ],
+    "C2KB-EVIDENCE-004": [
+      "validation/tests/test_governance.py::GovernanceTests.test_business_confirmation_cannot_be_used_as_runtime_observation"
+    ],
+    "C2KB-EVIDENCE-005": [
+      "validation/tests/test_knowledge.py::KnowledgeTests.test_unconfirmed_intent_cannot_be_projected_to_robot_knowledge"
+    ],
+    "C2KB-EVIDENCE-006": [
+      "validation/tests/test_knowledge.py::KnowledgeTests.test_business_evidence_must_cover_referenced_intent"
+    ],
+    "C2KB-EVIDENCE-007": [
+      "validation/tests/test_knowledge.py::KnowledgeTests.test_published_intent_requires_behavior_fact"
+    ],
+    "C2KB-EVIDENCE-008": [
+      "validation/tests/test_knowledge.py::KnowledgeTests.test_business_evidence_requires_source_digest"
+    ],
+    "C2KB-EVIDENCE-009": [
+      "validation/tests/test_governance.py::GovernanceTests.test_evidence_change_invalidates_module_approval"
+    ],
+    "C2KB-EXT-001": [
+      "validation/tests/test_knowledge.py::KnowledgeTests.test_registered_uniapp_page_cannot_be_omitted"
+    ],
+    "C2KB-EXT-002": [
+      "validation/tests/test_knowledge.py::KnowledgeTests.test_configured_inventory_manifest_must_exist"
+    ],
+    "C2KB-EXT-003": [
+      "validation/tests/test_knowledge.py::KnowledgeTests.test_registered_uniapp_page_cannot_be_omitted"
+    ],
+    "C2KB-EXT-004": [
+      "validation/tests/test_knowledge.py::KnowledgeTests.test_php_java_profile_with_custom_repository_ids"
+    ],
+    "C2KB-EXT-005": [
+      "validation/tests/test_knowledge.py::KnowledgeTests.test_single_backend_with_event_entry_and_method_catalog"
+    ],
+    "C2KB-EXT-006": [
+      "validation/tests/test_conformance.py::ConformanceTests.test_report_matches_checked_in_expectation",
+      "conformance/compatibility-statement.template.json"
+    ],
+    "C2KB-META-001": [
+      "validation/tests/test_knowledge.py::KnowledgeTests.test_config_rejects_unknown_and_duplicate_fields",
+      "conformance/invalid/duplicate-standard-version.json"
+    ],
+    "C2KB-META-002": [
+      "validation/tests/test_knowledge.py::KnowledgeTests.test_rejects_non_current_standard_version",
+      "conformance/valid/minimal-config.json"
+    ],
+    "C2KB-META-003": [
+      "validation/tests/test_knowledge.py::KnowledgeTests.test_repository_paths_support_environment_variables"
+    ],
+    "C2KB-META-004": [
+      "validation/tests/test_knowledge.py::KnowledgeTests.test_repository_path_rejects_mixed_environment_expression",
+      "conformance/invalid/unsafe-environment-path.json"
+    ],
+    "C2KB-META-005": [
+      "validation/tests/test_knowledge.py::KnowledgeTests.test_repository_commit_cannot_use_environment_variable"
+    ],
+    "C2KB-META-006": [
+      "validation/tests/test_knowledge.py::KnowledgeTests.test_policy_reviewed_document_requires_separate_policy_metadata"
+    ],
+    "C2KB-META-007": [
+      "validation/tests/test_governance.py::GovernanceTests.test_policy_review_can_publish_and_records_provenance"
+    ],
+    "C2KB-PROJECT-001": [
+      "validation/tests/test_knowledge.py::KnowledgeTests.test_check_counts_and_draft_files"
+    ],
+    "C2KB-PROJECT-002": [
+      "validation/tests/test_knowledge.py::KnowledgeTests.test_reject_link_to_unpublished_file"
+    ],
+    "C2KB-PROJECT-003": [
+      "validation/tests/test_knowledge.py::KnowledgeTests.test_check_counts_and_draft_files"
+    ],
+    "C2KB-PROJECT-004": [
+      "validation/tests/test_knowledge.py::KnowledgeTests.test_module_work_requires_complete_outline"
+    ],
+    "C2KB-PROJECT-005": [
+      "validation/tests/test_knowledge.py::KnowledgeTests.test_publish_isolated_views_and_no_overwrite"
+    ],
+    "C2KB-PROJECT-006": [
+      "validation/tests/test_governance.py::GovernanceTests.test_second_release_requires_current_snapshot_committed"
+    ],
+    "C2KB-RELEASE-001": [
+      "validation/tests/test_governance.py::GovernanceTests.test_document_commit_must_contain_exact_inputs"
+    ],
+    "C2KB-RELEASE-002": [
+      "validation/tests/test_governance.py::GovernanceTests.test_future_generator_cannot_omit_review_provenance"
+    ],
+    "C2KB-RELEASE-003": [
+      "validation/tests/test_governance.py::GovernanceTests.test_current_pointer_tampering_is_detected"
+    ],
+    "C2KB-RELEASE-004": [
+      "validation/tests/test_governance.py::GovernanceTests.test_failed_post_install_audit_restores_previous_snapshot"
+    ],
+    "C2KB-RELEASE-005": [
+      "validation/tests/test_governance.py::GovernanceTests.test_published_file_mutation_is_detected"
+    ],
+    "C2KB-REVIEW-001": [
+      "validation/tests/test_governance.py::GovernanceTests.test_changed_body_invalidates_approval"
+    ],
+    "C2KB-REVIEW-002": [
+      "validation/tests/test_governance.py::GovernanceTests.test_review_metadata_alone_cannot_publish"
+    ],
+    "C2KB-REVIEW-003": [
+      "validation/tests/test_governance.py::GovernanceTests.test_policy_review_requires_enabled_committed_policy"
+    ],
+    "C2KB-REVIEW-004": [
+      "validation/tests/test_governance.py::GovernanceTests.test_policy_review_rejects_candidate_source_check_and_risk_mismatches"
+    ],
+    "C2KB-REVIEW-005": [
+      "validation/tests/test_governance.py::GovernanceTests.test_policy_review_rejects_expired_or_incomplete_policy"
+    ],
+    "C2KB-REVIEW-006": [
+      "validation/tests/test_governance.py::GovernanceTests.test_policy_review_requires_external_report_when_policy_requests_it"
+    ],
+    "C2KB-ROLE-001": [
+      "validation/tests/test_knowledge.py::KnowledgeTests.test_publish_isolated_views_and_no_overwrite"
+    ],
+    "C2KB-ROLE-002": [
+      "validation/tests/test_knowledge.py::KnowledgeTests.test_publish_isolated_views_and_no_overwrite"
+    ],
+    "C2KB-ROLE-003": [
+      "validation/tests/test_knowledge.py::KnowledgeTests.test_publish_isolated_views_and_no_overwrite"
+    ],
+    "C2KB-ROLE-004": [
+      "validation/tests/test_knowledge.py::KnowledgeTests.test_publish_isolated_views_and_no_overwrite"
+    ],
+    "C2KB-VIEW-001": [
+      "validation/tests/test_knowledge.py::KnowledgeTests.test_publish_isolated_views_and_no_overwrite"
+    ],
+    "C2KB-VIEW-002": [
+      "validation/tests/test_knowledge.py::KnowledgeTests.test_reject_obvious_technical_content_in_business"
+    ],
+    "C2KB-VIEW-003": [
+      "validation/tests/test_knowledge.py::KnowledgeTests.test_reject_plain_text_reference_to_unpublished_file"
+    ],
+    "C2KB-VIEW-004": [
+      "validation/tests/test_governance.py::GovernanceTests.test_business_only_package_retains_technical_sources_as_drafts"
+    ],
+    "C2KB-VIEW-005": [
+      "validation/tests/test_governance.py::GovernanceTests.test_business_index_rejects_process_vocabulary"
+    ],
+    "C2KB-VIEW-006": [
+      "validation/tests/test_governance.py::GovernanceTests.test_publish_preserves_all_eight_documents_and_routes"
+    ]
+  }
+}

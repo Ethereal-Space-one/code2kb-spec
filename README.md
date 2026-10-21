@@ -4,7 +4,7 @@
 
 Code2KB Spec 是一套把固定源码提交转换为可追溯、可审核、可发布知识库的开放规范，并提供 Python 参考实现、AI Agent Skill、模板和技术栈适配器。
 
-> 工程版本：`0.2.0`；知识规范版本：`0.8.3`。两者独立演进。
+> 工程版本：`0.3.0`；知识规范版本：`0.8.3`。两者独立演进。
 
 ## 三层结构
 
@@ -32,6 +32,7 @@ git clone https://github.com/Ethereal-Space-one/code2kb-spec.git
 cd code2kb-spec
 python3 -B -m unittest discover -s validation/tests -q
 python3 -B scripts/check_spec_ids.py
+python3 -B scripts/check_conformance.py --check-expected
 ```
 
 可以安装本地命令：
@@ -66,14 +67,13 @@ code2kb check --project-root /path/to/knowledge-project
 
 完整命令和发布流程见[使用指南](docs/usage.md)。
 
-## 0.2.0 新能力
+## 0.3.0 新能力
 
-- 安全的 `${UPPER_CASE_ENV}` 源码路径；
-- 人工审核与策略化自动审核分离；
-- 高影响字段、配置键和正文一致性门禁；
-- 业务证据、行为事实和业务意图闭环；
-- 严格 JSON、审核溯源和纯发布物审计；
-- 可安装的 `code2kb` 命令。
+- 完整、独立于参考实现源码的元数据协议；
+- 61 条规范要求到测试、夹具或示例的显式覆盖表；
+- 可供其他语言实现复用的一致性夹具和确定性报告；
+- 第三方实现兼容声明模板与版本兼容说明；
+- 通过 Pull Request、受保护分支和 CI 管理公开发布。
 
 ## 能力边界
 
@@ -93,13 +93,14 @@ code2kb check --project-root /path/to/knowledge-project
 ```text
 ├── SPEC.md、spec/                  # 规范性内容
 ├── validation/                    # 官方 Python 参考实现
+├── conformance/                   # 跨实现夹具、覆盖表与预期报告
 ├── skills/、templates/、adapters/ # Agent 工具、模板和适配器
 ├── examples/                      # 可运行示例
 ├── scripts/                       # 仓库质量检查
 └── docs/                          # 教程和实现说明
 ```
 
-版本规则见[版本管理](docs/versioning.md)，本版验证结果见[0.2.0 开源审计](docs/open-source-audit.md)，后续方向见 [ROADMAP](ROADMAP.md)。
+版本规则见[版本管理](docs/versioning.md)，升级关系见[兼容性说明](docs/compatibility.md)，本版验证结果见[0.3.0 开源审计](docs/open-source-audit.md)，后续方向见 [ROADMAP](ROADMAP.md)。
 
 ## 参与贡献
 
