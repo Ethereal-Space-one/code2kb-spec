@@ -1,0 +1,10 @@
+{
+  "standard_version": "0.8.3",
+  "knowledge_source_root": "知识源",
+  "repositories": {
+    "source_a": {
+      "path": "${CODE2KB_FIXTURE_SOURCE}/src",
+      "commit": "0123456789abcdef"
+    }
+  }
+}

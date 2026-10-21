@@ -1,6 +1,6 @@
 # Code2KB Spec 使用指南
 
-> 工程版本 `0.2.0`；知识规范 `0.8.3`。AI 的执行入口是 [`skills/extract-app-knowledge/SKILL.md`](../skills/extract-app-knowledge/SKILL.md)。
+> 工程版本 `0.3.0`；知识规范 `0.8.3`。AI 的执行入口是 [`skills/extract-app-knowledge/SKILL.md`](../skills/extract-app-knowledge/SKILL.md)。
 
 ## 工作方式
 

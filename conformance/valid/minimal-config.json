@@ -1,0 +1,23 @@
+{
+  "standard_version": "0.8.3",
+  "knowledge_source_root": "知识源",
+  "coverage_terms": [],
+  "sensitive_patterns": [],
+  "boundary_notes": {
+    "business": "运行表现尚未验证。",
+    "engineering": "没有部署证据时保持 source_only。"
+  },
+  "policy_review": {
+    "enabled": false
+  },
+  "semantic_quality": {
+    "enabled": false,
+    "module_ids": ["*"]
+  },
+  "repositories": {
+    "source_a": {
+      "path": "${CODE2KB_FIXTURE_SOURCE}",
+      "commit": "0123456789abcdef"
+    }
+  }
+}

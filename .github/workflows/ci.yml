@@ -25,6 +25,8 @@ jobs:
         run: python -B -m unittest discover -s validation/tests -q
       - name: Specification IDs
         run: python -B scripts/check_spec_ids.py
+      - name: Conformance fixtures
+        run: python -B scripts/check_conformance.py --check-expected
       - name: Markdown links
         run: python -B scripts/check_markdown_links.py
       - name: Public content

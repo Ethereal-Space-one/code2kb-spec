@@ -4,7 +4,7 @@
 
 Code2KB Spec is an open specification for turning fixed source revisions into traceable, reviewable, and publishable knowledge bases. The repository also provides a Python reference implementation, an AI agent skill, templates, and stack adapters.
 
-> Project version: `0.2.0`; knowledge specification version: `0.8.3`. They evolve independently.
+> Project version: `0.3.0`; knowledge specification version: `0.8.3`. They evolve independently.
 
 ## Three layers
 
@@ -22,6 +22,7 @@ The normative specification is currently written in Simplified Chinese. If a tra
 git clone https://github.com/Ethereal-Space-one/code2kb-spec.git
 cd code2kb-spec
 python3 -B -m unittest discover -s validation/tests -q
+python3 -B scripts/check_conformance.py --check-expected
 python3 -m pip install -e .
 code2kb --help
 code2kb --version
@@ -36,14 +37,13 @@ code2kb check --project-root /path/to/knowledge-project
 
 See the [Chinese README](README.md) and [usage guide](docs/usage.md) for the complete workflow.
 
-## 0.2.0 highlights
+## 0.3.0 highlights
 
-- safe environment-variable repository paths;
-- separate human and policy-based automated review modes;
-- semantic gates for high-impact fields, configuration keys, and document consistency;
-- a closed evidence chain for business intent;
-- strict JSON, review provenance, and artifact-only release audits;
-- an installable `code2kb` command.
+- a complete metadata contract that can be implemented without reading the Python source;
+- an explicit coverage map for all 61 normative requirements;
+- portable conformance fixtures and a deterministic machine-readable report;
+- a compatibility statement template for third-party implementations;
+- a pull-request and CI based public release workflow.
 
 ## Boundaries
 
