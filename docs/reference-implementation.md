@@ -1,0 +1,18 @@
+# 官方参考实现
+
+`validation/` 是 Code2KB Spec 0.8.3 的官方 Python 参考实现。它使用标准库，覆盖项目检查、影响队列、候选准备、人工批准、策略审核、发布和纯产物审计。
+
+安装开发版本后可使用：
+
+```bash
+python3 -m pip install -e .
+code2kb check --project-root /path/to/knowledge-project
+```
+
+源码运行方式继续可用：
+
+```bash
+python3 -B validation/knowledge.py check --project-root /path/to/knowledge-project
+```
+
+参考实现只验证可确定的结构、摘要和门禁。通过检查不代表代码解释、业务政策、线上部署或现实身份已经被证明。

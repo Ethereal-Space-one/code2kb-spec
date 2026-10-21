@@ -1,0 +1,26 @@
+{
+  "schema_version": "1.0",
+  "policy_id": "example-auto-review-v1",
+  "policy_version": "1.0.0",
+  "policy_owner": "replace-with-real-owner",
+  "authorized_at": "2026-10-17",
+  "authorization_note": "替换为真实的预授权边界；模板本身不是有效授权",
+  "expires_at": "2027-10-17",
+  "allowed_module_ids": ["*"],
+  "allowed_risk_levels": ["low", "medium"],
+  "required_checks": [
+    "knowledge_check",
+    "impact_clear",
+    "qa_four_categories",
+    "source_traceability",
+    "cross_module_consistency",
+    "sensitive_scan"
+  ],
+  "manual_gate_categories": [
+    "security_boundary",
+    "business_policy",
+    "financial_policy",
+    "runtime_conflict",
+    "source_gap"
+  ]
+}

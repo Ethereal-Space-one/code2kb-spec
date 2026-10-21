@@ -1,0 +1,48 @@
+{
+  "schema_version": "1.0",
+  "run_id": "weekly-20261018-001",
+  "module_id": "example.module",
+  "policy_id": "example-auto-review-v1",
+  "policy_version": "1.0.0",
+  "review_subject_digest": "0000000000000000000000000000000000000000000000000000000000000000",
+  "risk_level": "medium",
+  "source_revisions": {
+    "source_a": "0123456789abcdef"
+  },
+  "checks": [
+    {
+      "check_id": "knowledge_check",
+      "status": "passed",
+      "report_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "check_id": "impact_clear",
+      "status": "passed",
+      "report_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "check_id": "qa_four_categories",
+      "status": "passed",
+      "report_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "check_id": "source_traceability",
+      "status": "passed",
+      "report_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "check_id": "cross_module_consistency",
+      "status": "passed",
+      "report_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "check_id": "sensitive_scan",
+      "status": "passed",
+      "report_sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  ],
+  "findings": [],
+  "external_reports": [],
+  "completed_at": "2026-10-18T20:00:00+08:00",
+  "executed_by": "ci-bot"
+}

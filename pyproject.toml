@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "code2kb-spec"
+version = "0.2.0"
+description = "An evidence-aware specification and reference implementation for turning code into governed knowledge bases."
+readme = "README.md"
+requires-python = ">=3.9"
+license = {file = "LICENSE"}
+authors = [{name = "Ethereal-Space-one"}]
+keywords = ["knowledge-base", "ai-agents", "documentation", "static-analysis"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+]
+
+[project.urls]
+Homepage = "https://github.com/Ethereal-Space-one/code2kb-spec"
+Repository = "https://github.com/Ethereal-Space-one/code2kb-spec"
+Issues = "https://github.com/Ethereal-Space-one/code2kb-spec/issues"
+
+[project.scripts]
+code2kb = "validation.knowledge:main"
+
+[tool.setuptools]
+packages = ["validation", "validation.adapters"]

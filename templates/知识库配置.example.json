@@ -1,0 +1,22 @@
+{
+  "standard_version": "0.8.3",
+  "knowledge_source_root": "知识源",
+  "coverage_terms": ["入口", "调用", "未覆盖"],
+  "sensitive_patterns": [],
+  "boundary_notes": {
+    "business": "动态配置和业务政策的实际取值需另行确认。",
+    "engineering": "缺部署配对或运行依据时保持 source_only。"
+  },
+  "policy_review": {
+    "enabled": false,
+    "policy_file": "自动审核策略/example-auto-review-v1.json"
+  },
+  "semantic_quality": {
+    "enabled": false,
+    "module_ids": ["*"]
+  },
+  "repositories": {
+    "source_a": {"path": "${SOURCE_A_ROOT}", "commit": "0123456789abcdef"},
+    "source_b": {"path": "/absolute/path/to/source-b", "commit": "fedcba9876543210"}
+  }
+}

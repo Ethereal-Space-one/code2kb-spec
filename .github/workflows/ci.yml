@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Unit tests
+        run: python -B -m unittest discover -s validation/tests -q
+      - name: Specification IDs
+        run: python -B scripts/check_spec_ids.py
+      - name: Markdown links
+        run: python -B scripts/check_markdown_links.py
+      - name: Public content
+        run: python -B scripts/check_public_content.py
+      - name: Minimal project
+        run: python -B examples/create_demo.py
+      - name: Installable CLI
+        run: |
+          python -m pip install .
+          code2kb --help
+          code2kb --version
+      - name: Compile Python
+        run: python -m compileall -q validation scripts examples

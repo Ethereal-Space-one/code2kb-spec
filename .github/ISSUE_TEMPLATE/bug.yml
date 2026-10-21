@@ -1,0 +1,31 @@
+name: 缺陷报告
+description: 报告可复现的工具、规则或文档问题
+title: "[Bug] "
+labels: [bug]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: 问题描述
+      description: 请说明实际结果与预期结果。
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Code2KB Spec 版本
+      placeholder: 0.2.0
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 最小复现步骤
+      description: 请使用脱敏内容，不要粘贴凭据、私有源码或个人数据。
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: 环境
+      placeholder: 操作系统、Python 版本、Git 版本
