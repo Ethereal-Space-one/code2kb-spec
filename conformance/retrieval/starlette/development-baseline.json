@@ -16,7 +16,7 @@
       "missing_unknown_phrases": [],
       "module_recall_at_k": 1.0,
       "passed": true,
-      "query": "网页接口权限不够时默认会看到什么？",
+      "query": "使用内置权限检查的网页接口，权限不够时默认会看到什么？",
       "reciprocal_rank": 1.0,
       "source_release_correct": true,
       "unit_recall_at_k": 1.0
@@ -64,7 +64,7 @@
       "unit_recall_at_k": null
     }
   ],
-  "corpus_sha256": "62323a25812e6c31d61d6b2f6c2ca563843b9ae9d67f79ddc66234c54738ad43",
+  "corpus_sha256": "a637c69ddede070ef07a4ed369d061fa657ab87fa44437f358431afdd69a1861",
   "evaluator_sha256": "5dce2062475c114b17c40704a0aca44a32834a4abe18d740e5eada18c23381f1",
   "gate_status": "failed",
   "retriever_id": "lexical-v1",
@@ -72,7 +72,7 @@
   "source_commit": "61123a5c76ebb9d5786758008945c4fbbb380bf6",
   "suite_audience": "business",
   "suite_id": "starlette-dev-61123a5",
-  "suite_sha256": "7234f9969a675a7b02a8098cbc757051feb55162cb24534d65f0d5ee9dbe2a9d",
+  "suite_sha256": "e2203e868dea472ae70d60d12faf36c5721f25aca31a22fd0e42bdb69d880046",
   "summary": {
     "abstain_correct": 0,
     "abstain_total": 1,

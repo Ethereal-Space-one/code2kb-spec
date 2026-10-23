@@ -5,7 +5,7 @@
   "cases": [
     {
       "case_id": "http-default-permission",
-      "query": "网页接口权限不够时默认会看到什么？",
+      "query": "使用内置权限检查的网页接口，权限不够时默认会看到什么？",
       "expected_decision": "answer",
       "expected_module_ids": ["starlette.authentication.http"],
       "expected_unit_ids": ["ru.business.starlette.authentication.http.permission"],

@@ -5,13 +5,13 @@
   "cases": [
     {
       "case_id": "websocket-permission",
-      "query": "WebSocket 连接没权限时，也能配置成返回 404 吗？",
+      "query": "用内置权限装饰器检查 WebSocket 时，能把权限不足配置成返回 404 吗？",
       "expected_decision": "answer",
       "expected_module_ids": ["starlette.authentication.websocket"],
       "expected_unit_ids": ["ru.business.starlette.authentication.websocket.permission"],
       "required_phrases": ["`status_code` 参数对 WebSocket 不生效"],
       "required_unknown_phrases": [],
-      "forbidden_phrases": ["WebSocket 可配置 404"],
+      "forbidden_phrases": ["内置权限装饰器可让 WebSocket 权限不足返回 404"],
       "top_k": 2
     },
     {
@@ -27,7 +27,7 @@
     },
     {
       "case_id": "authentication-error",
-      "query": "认证后端报错时，响应状态一定是 403 吗？",
+      "query": "认证后端抛出框架的认证错误时，响应状态一定是 403 吗？",
       "expected_decision": "answer",
       "expected_module_ids": ["starlette.authentication.errors"],
       "expected_unit_ids": ["ru.business.starlette.authentication.errors.response"],

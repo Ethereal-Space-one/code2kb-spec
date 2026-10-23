@@ -7,7 +7,7 @@ question_variants: 开启调试后服务器错误还显示自定义页面吗
 release_id: starlette-61123a5
 retrieval_schema_version: 0.1
 source_documents: starlette/docs/exceptions.md
-source_headings: Custom exception handlers
+source_headings: 文首 debug 段（无独立标题）
 topic: 调试模式下服务器错误
 traceability_level: document
 unit_id: ru.business.starlette.exceptions.debug.response
