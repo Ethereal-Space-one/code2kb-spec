@@ -72,6 +72,7 @@ code2kb check --project-root /path/to/knowledge-project
 
 - 从已审核双版生成按主题切分、受众隔离的 Markdown 检索单元；
 - 独立检索清单、轻量路由索引、基础版本摘要绑定和篡改审计；
+- 对已审计的当前检索发布物执行只读查询，返回候选证据及双版正文出处；
 - 无外部依赖的离线检索评测，支持导入外部检索结果；
 - 可选 `compact` 正文模式与 full/compact 主题覆盖对照；
 - Agent Skill 按核心契约、当前任务和可选扩展加载。

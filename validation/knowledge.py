@@ -19,12 +19,12 @@ from urllib.parse import unquote
 try:
     from .adapters.uniapp_pages import read_uniapp_pages
     from .governance import Governance, json_text, atomic_write, digest, scan_business_terms
-    from . import retrieval_build, retrieval_evaluate, retrieval_audit, retrieval_profile
+    from . import retrieval_build, retrieval_evaluate, retrieval_audit, retrieval_profile, retrieval_query
     from .retrieval_model import strict_json as retrieval_json
 except ImportError:  # 兼容直接执行 validation/knowledge.py
     from adapters.uniapp_pages import read_uniapp_pages
     from governance import Governance, json_text, atomic_write, digest, scan_business_terms
-    import retrieval_build, retrieval_evaluate, retrieval_audit, retrieval_profile
+    import retrieval_build, retrieval_evaluate, retrieval_audit, retrieval_profile, retrieval_query
     from retrieval_model import strict_json as retrieval_json
 
 
@@ -1081,7 +1081,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--version", action="version", version=f"%(prog)s {IMPLEMENTATION_VERSION} (spec {STANDARD_VERSION})")
     subs = parser.add_subparsers(dest="action", required=True)
-    for action in ("check", "publish", "impact", "confirm-claims", "prepare", "approve", "policy-review", "audit-release", "retrieval-build", "retrieval-evaluate", "retrieval-audit", "retrieval-compare"):
+    for action in ("check", "publish", "impact", "confirm-claims", "prepare", "approve", "policy-review", "audit-release", "retrieval-build", "retrieval-evaluate", "retrieval-audit", "retrieval-compare", "retrieval-query"):
         sub = subs.add_parser(action)
         sub.add_argument("--project-root", type=Path, required=True)
         if action == "publish":
@@ -1100,6 +1100,10 @@ def main() -> int:
             sub.add_argument("--results", type=Path)
         if action == "retrieval-compare":
             sub.add_argument("--compact-project-root", type=Path, required=True)
+        if action == "retrieval-query":
+            sub.add_argument("--query", required=True)
+            sub.add_argument("--audience", choices=("business", "engineering"), default="business")
+            sub.add_argument("--top-k", type=int, default=3)
         if action in {"confirm-claims", "prepare", "approve", "policy-review"}:
             sub.add_argument("--module-id", required=True)
         if action == "impact":
@@ -1126,6 +1130,9 @@ def main() -> int:
     args = parser.parse_args()
     try:
         project = args.project_root.resolve(strict=True)
+        if args.action == "retrieval-query":
+            print(json_text(retrieval_query.query_current(project, args.query, args.audience, args.top_k, sys.modules[__name__])))
+            return 0
         if args.action == "retrieval-compare":
             compact_project = args.compact_project_root.resolve(strict=True)
             releases = {}

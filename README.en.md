@@ -41,6 +41,7 @@ See the [Chinese README](README.md) and [usage guide](docs/usage.md) for the com
 
 - optional topic-sized Markdown retrieval units, separated by audience and bound to an audited base release;
 - an independent retrieval manifest, routing index, evaluation gate, and tamper audit;
+- read-only lookup of candidate evidence and source paths from the audited current retrieval release;
 - an offline lexical baseline and a strict external-results import format;
 - a compact authoring profile and a full-versus-compact topic comparison;
 - task-scoped Agent Skill contracts with optional extensions.

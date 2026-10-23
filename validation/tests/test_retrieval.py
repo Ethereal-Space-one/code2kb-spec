@@ -78,6 +78,32 @@ class RetrievalTests(unittest.TestCase):
         path.write_text(path.read_text() + "\n篡改\n", encoding="utf-8")
         self.assertIn("被增删改", self.fixture.run_cli("retrieval-audit", "--release-id", "retrieval-test").stderr)
 
+    def test_query_reads_only_audited_current_evidence(self):
+        self.publish()
+        release = self.build()
+        query_args = ("retrieval-query", "--query", "订单查询失败时会怎样")
+        self.assertNotEqual(self.fixture.run_cli(*query_args).returncode, 0)
+        self.assertEqual(self.fixture.run_cli("retrieval-evaluate", "--release-id", "retrieval-test", "--suite", str(self.suite_path)).returncode, 0)
+        result = self.fixture.run_cli(*query_args)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        response = json.loads(result.stdout)
+        self.assertEqual(response["release_id"], "retrieval-test")
+        self.assertEqual(response["answerability"], "not_assessed")
+        self.assertEqual(response["audience"], "business")
+        self.assertTrue(response["hits"])
+        for hit in response["hits"]:
+            self.assertEqual(hit["audience"], "business")
+            self.assertTrue((self.project / hit["unit_path"]).is_file())
+            self.assertTrue(all((self.project / path).is_file() for path in hit["source_paths"]))
+            self.assertTrue(all(path.startswith("发布/业务版/") for path in hit["source_paths"]))
+        engineering = self.fixture.run_cli("retrieval-query", "--query", "METHOD-001", "--audience", "engineering")
+        self.assertEqual(engineering.returncode, 0, engineering.stderr)
+        self.assertTrue(any(hit["audience"] == "engineering" for hit in json.loads(engineering.stdout)["hits"]))
+        self.assertNotEqual(self.fixture.run_cli(*query_args, "--top-k", "21").returncode, 0)
+        unit_path = self.project / response["hits"][0]["unit_path"]
+        unit_path.write_text(unit_path.read_text(encoding="utf-8") + "\n改动\n", encoding="utf-8")
+        self.assertNotEqual(self.fixture.run_cli(*query_args).returncode, 0)
+
     def test_audit_rejects_changed_base_or_report(self):
         self.publish()
         release = self.build()
