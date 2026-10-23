@@ -19,9 +19,13 @@ from urllib.parse import unquote
 try:
     from .adapters.uniapp_pages import read_uniapp_pages
     from .governance import Governance, json_text, atomic_write, digest, scan_business_terms
+    from . import retrieval_build, retrieval_evaluate, retrieval_audit, retrieval_profile
+    from .retrieval_model import strict_json as retrieval_json
 except ImportError:  # 兼容直接执行 validation/knowledge.py
     from adapters.uniapp_pages import read_uniapp_pages
     from governance import Governance, json_text, atomic_write, digest, scan_business_terms
+    import retrieval_build, retrieval_evaluate, retrieval_audit, retrieval_profile
+    from retrieval_model import strict_json as retrieval_json
 
 
 _VERSION_FILE = Path(__file__).resolve().parents[1] / "VERSION"
@@ -201,6 +205,16 @@ def read_config(project: Path, *, resolve_repository_paths: bool = True, environ
         "semantic_quality",
     }
     config = strict_json_object(config_path, allowed=allowed, label="知识库配置")
+    profile_path = project / "Code2KB工程配置.json"
+    if profile_path.exists():
+        if profile_path.is_symlink():
+            raise KnowledgeError("工程配置不能是符号链接")
+        profile = strict_json_object(profile_path, allowed={"schema_version", "content_profile"}, label="工程配置")
+        if set(profile) != {"schema_version", "content_profile"} or profile["schema_version"] != "0.1" or profile["content_profile"] not in {"full", "compact"}:
+            raise KnowledgeError("工程配置仅支持 schema_version: 0.1 与 content_profile: full|compact")
+        config["_content_profile"] = profile["content_profile"]
+    else:
+        config["_content_profile"] = "full"
     if config.get("standard_version") not in SUPPORTED_STANDARD_VERSIONS:
         raise KnowledgeError(f"{config_path}: standard_version 必须为 {STANDARD_VERSION}")
     if "publish_boundary" in config:
@@ -861,11 +875,11 @@ def validate_project(docs: list[Document], outline: Outline, config: dict, adapt
         api_ids, method_ids = set(api_rows), set(method_rows)
         published = [doc for doc in items if doc.publishable]
         if published:
-            required = {"overview", "scope"}
+            required = {"overview", "scope"} if config.get("_content_profile") != "compact" else {"overview", "rules", "faq"}
             root = Path(items[0].domain, items[0].module)
             available = {doc.doc_type for doc in published if doc.relative.parent == root}
             if not required <= available:
-                raise KnowledgeError(f"{module_id}: 发布模块至少需要已审的模块概览和功能与范围")
+                raise KnowledgeError(f"{module_id}: 发布模块缺少 {sorted(required - available)}；请核对 full/compact profile")
             if for_publish:
                 if not fact_count:
                     raise KnowledgeError(f"{module_id}: 发布模块的结构化规格没有事实条目")
@@ -883,8 +897,12 @@ def validate_project(docs: list[Document], outline: Outline, config: dict, adapt
         if "implementation" in technical:
             if api_ids and "api_catalog" not in technical:
                 raise KnowledgeError(f"{module_id}: 结构化规格有接口，发布研发知识须包含已审的接口与调用.md")
-            if method_ids and "method_catalog" not in technical:
+            if method_ids and "method_catalog" not in technical and config.get("_content_profile") != "compact":
                 raise KnowledgeError(f"{module_id}: 结构化规格有方法，发布研发知识须包含已审的方法与源码.md")
+            if method_ids and "method_catalog" not in technical and config.get("_content_profile") == "compact":
+                missing = sorted(method_ids - set(re.findall(r"METHOD-[A-Za-z0-9-]+", technical["implementation"].body)))
+                if missing:
+                    raise KnowledgeError(f"{module_id}: compact 技术实现缺少方法定位 {missing}")
         if "api_catalog" in technical:
             validate_catalog(technical["api_catalog"], api_rows, core_ids, config, cache, sources)
         if "method_catalog" in technical:
@@ -1063,26 +1081,39 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--version", action="version", version=f"%(prog)s {IMPLEMENTATION_VERSION} (spec {STANDARD_VERSION})")
     subs = parser.add_subparsers(dest="action", required=True)
-    for action in ("check", "publish", "impact", "confirm-claims", "prepare", "approve", "policy-review", "audit-release"):
+    for action in ("check", "publish", "impact", "confirm-claims", "prepare", "approve", "policy-review", "audit-release", "retrieval-build", "retrieval-evaluate", "retrieval-audit", "retrieval-compare"):
         sub = subs.add_parser(action)
         sub.add_argument("--project-root", type=Path, required=True)
         if action == "publish":
             sub.add_argument("--business-out", type=Path, help="兼容参数；0.8.3 只接受固定路径 发布/业务版")
             sub.add_argument("--engineering-out", type=Path, help="兼容参数；0.8.3 只接受固定路径 发布/研发版")
             sub.add_argument("--release-id", required=True)
+            sub.add_argument("--with-retrieval", action="store_true")
+            sub.add_argument("--retrieval-suite", type=Path)
+            sub.add_argument("--retrieval-profile", choices=("full", "compact"))
+        if action in {"retrieval-build", "retrieval-evaluate", "retrieval-audit"}:
+            sub.add_argument("--release-id", required=True)
+        if action == "retrieval-build":
+            sub.add_argument("--profile", choices=("full", "compact"))
+        if action == "retrieval-evaluate":
+            sub.add_argument("--suite", type=Path, required=True)
+            sub.add_argument("--results", type=Path)
+        if action == "retrieval-compare":
+            sub.add_argument("--compact-project-root", type=Path, required=True)
         if action in {"confirm-claims", "prepare", "approve", "policy-review"}:
             sub.add_argument("--module-id", required=True)
         if action == "impact":
             sub.add_argument("--module-id")
         if action == "prepare":
-            sub.add_argument("--business-topics", required=True)
-            sub.add_argument("--business-unknowns", required=True)
-            sub.add_argument("--business-keywords", required=True)
+            sub.add_argument("--business-topics")
+            sub.add_argument("--business-unknowns")
+            sub.add_argument("--business-keywords")
             sub.add_argument("--engineering-topics")
             sub.add_argument("--engineering-unknowns")
             sub.add_argument("--engineering-keywords")
             sub.add_argument("--files", help="可选：模块内相对文件名，逗号分隔；默认全部当前正文")
             sub.add_argument("--refresh", action="store_true")
+            sub.add_argument("--auto-retrieval-metadata", action="store_true")
         if action == "approve":
             sub.add_argument("--reviewed-by", required=True)
             sub.add_argument("--reviewed-at", required=True)
@@ -1095,6 +1126,39 @@ def main() -> int:
     args = parser.parse_args()
     try:
         project = args.project_root.resolve(strict=True)
+        if args.action == "retrieval-compare":
+            compact_project = args.compact_project_root.resolve(strict=True)
+            releases = {}
+            for target in (project, compact_project):
+                base = Governance(target, target / "知识源", {}, [], None, sys.modules[__name__]).audit_release(None)
+                retrieval_audit.audit_in_release(target / "发布", base["release_id"])
+                releases[target] = base["release_id"]
+            full_release, compact_release = project / "发布", compact_project / "发布"
+            full_manifest = retrieval_json(full_release / "检索清单" / f"{releases[project]}.json")
+            compact_manifest = retrieval_json(compact_release / "检索清单" / f"{releases[compact_project]}.json")
+            if full_manifest["profile"] != "full" or compact_manifest["profile"] != "compact":
+                raise KnowledgeError("retrieval-compare 要求分别输入 full 与 compact 检索发布项目")
+            result = retrieval_profile.compare(retrieval_evaluate.load_units(full_release, full_manifest), retrieval_evaluate.load_units(compact_release, compact_manifest))
+            print(json_text(result))
+            return 0 if result["passed"] else 1
+        if args.action == "retrieval-audit":
+            governance = Governance(project, project / "知识源", {}, [], None, sys.modules[__name__])
+            governance.audit_release(None)
+            print(json_text(retrieval_audit.audit_in_release(project / "发布", args.release_id)))
+            return 0
+        if args.action == "retrieval-build":
+            result = retrieval_build.build(project, args.release_id, args.profile, sys.modules[__name__])
+            retrieval_audit.audit_in_release(project / "发布", args.release_id, require_ready=False)
+            print(json_text(result))
+            return 0
+        if args.action == "retrieval-evaluate":
+            governance = Governance(project, project / "知识源", {}, [], None, sys.modules[__name__])
+            governance.audit_release(None)
+            retrieval_audit.audit_in_release(project / "发布", args.release_id, require_ready=False)
+            report = retrieval_evaluate.evaluate_in_release(project / "发布", args.release_id, args.suite.resolve(strict=True), args.results.resolve(strict=True) if args.results else None)
+            retrieval_audit.audit_in_release(project / "发布", args.release_id, require_ready=False)
+            print(json_text(report))
+            return 0 if report["gate_status"] == "passed" else 1
         if args.action == "audit-release":
             governance = Governance(project, project / "知识源", {}, [], None, sys.modules[__name__])
             result = governance.audit_release(args.release_id)
@@ -1120,6 +1184,16 @@ def main() -> int:
             print(json_text(governance.confirm_claims(args.module_id)))
             return 0
         if args.action == "prepare":
+            if args.auto_retrieval_metadata:
+                auto = retrieval_build.metadata_candidates(governance.module_docs(args.module_id))
+                args.business_topics = args.business_topics or auto["business_topics"]
+                args.business_unknowns = args.business_unknowns or auto["business_unknowns"]
+                args.business_keywords = args.business_keywords or auto["business_keywords"]
+                args.engineering_topics = args.engineering_topics or auto.get("engineering_topics")
+                args.engineering_unknowns = args.engineering_unknowns or auto.get("engineering_unknowns")
+                args.engineering_keywords = args.engineering_keywords or auto.get("engineering_keywords")
+            if not all((args.business_topics, args.business_unknowns, args.business_keywords)):
+                raise KnowledgeError("prepare 需提供业务检索字段，或启用 --auto-retrieval-metadata 并在正文中找到依据")
             print(json_text(governance.prepare(
                 args.module_id, args.business_topics, args.business_unknowns, args.business_keywords,
                 args.engineering_topics, args.engineering_unknowns, args.engineering_keywords,
@@ -1139,6 +1213,7 @@ def main() -> int:
         result = {
             "implementation_version": IMPLEMENTATION_VERSION,
             "standard_version": config["standard_version"],
+            "content_profile": config["_content_profile"],
             "outline_modules": len(outline.modules),
             "outline_entries": len(outline.entries),
             "unclassified_entries": sum(entry[3] == "未归类" for entry in outline.entries),
@@ -1167,6 +1242,12 @@ def main() -> int:
             return 0
         if not any(doc.doc_type == "overview" for doc in selected):
             raise KnowledgeError("没有可发布的已审业务模块")
+        if args.with_retrieval and not args.retrieval_suite:
+            raise KnowledgeError("--with-retrieval 需要 --retrieval-suite")
+        if args.retrieval_suite and not args.with_retrieval:
+            raise KnowledgeError("--retrieval-suite 只能与 --with-retrieval 一起使用")
+        if args.retrieval_profile and args.retrieval_profile != config["_content_profile"]:
+            raise KnowledgeError("--retrieval-profile 与项目工程配置不一致")
         expected_business = project / "发布" / "业务版"
         expected_engineering = project / "发布" / "研发版"
         supplied_business = args.business_out or expected_business
@@ -1226,11 +1307,20 @@ def main() -> int:
             pointer = governance.current_pointer(args.release_id, record, digest(stage_registry.read_bytes()))
             atomic_write(stage_release / "当前版本.json", json_text(pointer))
             atomic_write(stage_release / "当前版本.md", governance.current_markdown(pointer))
+            if args.with_retrieval:
+                suite_path = args.retrieval_suite.resolve(strict=True)
+                retrieval_build.build_in_release(stage_release, args.release_id, config["_content_profile"], governance.generator_identity(), lambda value, where: scan_business_terms(sys.modules[__name__], value, where))
+                report = retrieval_evaluate.evaluate_in_release(stage_release, args.release_id, suite_path)
+                if report["gate_status"] != "passed":
+                    raise KnowledgeError("检索评测未通过；基础发布和检索扩展均未替换")
+                retrieval_audit.audit_in_release(stage_release, args.release_id)
             if governance.release_root.exists():
                 os.replace(governance.release_root, backup_release)
             os.replace(stage_release, governance.release_root)
             installed = True
             governance.audit_release(None)
+            if args.with_retrieval:
+                result["retrieval"] = retrieval_audit.audit_in_release(governance.release_root, args.release_id)
             result["current_release"] = pointer
             result["next_step"] = f"提交整个 发布/ 并建议创建标签 kb-{args.release_id}；提交前不要开始下一次发布"
         except Exception:

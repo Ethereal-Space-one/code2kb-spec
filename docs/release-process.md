@@ -17,6 +17,7 @@
 python3 -B -m unittest discover -s validation/tests -q
 python3 -B scripts/check_spec_ids.py
 python3 -B scripts/check_conformance.py --check-expected
+python3 -B scripts/check_retrieval_scale.py
 python3 -B scripts/check_markdown_links.py
 python3 -B scripts/check_public_content.py
 python3 -B examples/create_demo.py

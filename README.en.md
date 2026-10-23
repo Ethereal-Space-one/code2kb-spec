@@ -4,7 +4,7 @@
 
 Code2KB Spec is an open specification for turning fixed source revisions into traceable, reviewable, and publishable knowledge bases. The repository also provides a Python reference implementation, an AI agent skill, templates, and stack adapters.
 
-> Project version: `0.3.0`; knowledge specification version: `0.8.3`. They evolve independently.
+> Project version: `0.4.0`; knowledge specification version: `0.8.3`. They evolve independently.
 
 ## Three layers
 
@@ -37,13 +37,15 @@ code2kb check --project-root /path/to/knowledge-project
 
 See the [Chinese README](README.md) and [usage guide](docs/usage.md) for the complete workflow.
 
-## 0.3.0 highlights
+## 0.4.0 highlights
 
-- a complete metadata contract that can be implemented without reading the Python source;
-- an explicit coverage map for all 61 normative requirements;
-- portable conformance fixtures and a deterministic machine-readable report;
-- a compatibility statement template for third-party implementations;
-- a pull-request and CI based public release workflow.
+- optional topic-sized Markdown retrieval units, separated by audience and bound to an audited base release;
+- an independent retrieval manifest, routing index, evaluation gate, and tamper audit;
+- an offline lexical baseline and a strict external-results import format;
+- a compact authoring profile and a full-versus-compact topic comparison;
+- task-scoped Agent Skill contracts with optional extensions.
+
+See the [retrieval contract](docs/retrieval-contract.md) and [evaluation guide](docs/retrieval-evaluation.md). The default two-view release remains unchanged.
 
 ## Boundaries
 
