@@ -4,7 +4,7 @@
 
 Code2KB Spec 是一套把固定源码提交转换为可追溯、可审核、可发布知识库的开放规范，并提供 Python 参考实现、AI Agent Skill、模板和技术栈适配器。
 
-> 工程版本：`0.4.0`；知识规范版本：`0.8.3`。两者独立演进。
+> 当前开源工程候选版本：`0.4.0`。知识文件协议的兼容标识见[版本管理](docs/versioning.md)，不与任何使用本工具的知识库项目同步编号。
 
 ## 三层结构
 
@@ -76,7 +76,7 @@ code2kb check --project-root /path/to/knowledge-project
 - 可选 `compact` 正文模式与 full/compact 主题覆盖对照；
 - Agent Skill 按核心契约、当前任务和可选扩展加载。
 
-检索扩展的[产物契约](docs/retrieval-contract.md)与[评测手顺](docs/retrieval-evaluation.md)独立于知识规范 0.8.3。默认发布行为保持双版；只有显式启用检索扩展时才产生检索就绪指针。
+检索扩展的[产物契约](docs/retrieval-contract.md)与[评测手顺](docs/retrieval-evaluation.md)独立维护。默认发布行为保持双版；只有显式启用检索扩展时才产生检索就绪指针。
 
 ## 能力边界
 

@@ -4,7 +4,7 @@
 
 Code2KB Spec is an open specification for turning fixed source revisions into traceable, reviewable, and publishable knowledge bases. The repository also provides a Python reference implementation, an AI agent skill, templates, and stack adapters.
 
-> Project version: `0.4.0`; knowledge specification version: `0.8.3`. They evolve independently.
+> Current open-source project candidate: `0.4.0`. The knowledge file protocol has its own compatibility identifier; it does not follow the version of any project using this tool.
 
 ## Three layers
 
