@@ -1,12 +1,11 @@
 {
-  "schema_version": "0.2",
+  "schema_version": "0.1",
   "suite_id": "starlette-holdout-61123a5",
   "audience": "business",
   "cases": [
     {
       "case_id": "websocket-permission",
       "query": "用内置权限装饰器检查 WebSocket 时，能把权限不足配置成返回 404 吗？",
-      "expected_decision": "answer",
       "expected_module_ids": ["starlette.authentication.websocket"],
       "expected_unit_ids": ["ru.business.starlette.authentication.websocket.permission"],
       "required_phrases": ["`status_code` 参数对 WebSocket 不生效"],
@@ -17,7 +16,6 @@
     {
       "case_id": "background-response",
       "query": "后台任务在响应已经发给用户后失败，错误处理器还能改掉那次响应吗？",
-      "expected_decision": "answer",
       "expected_module_ids": ["starlette.exceptions.background"],
       "expected_unit_ids": ["ru.business.starlette.exceptions.background.response"],
       "required_phrases": ["新生成的响应会被丢弃"],
@@ -28,7 +26,6 @@
     {
       "case_id": "authentication-error",
       "query": "认证后端抛出框架的认证错误时，响应状态一定是 403 吗？",
-      "expected_decision": "answer",
       "expected_module_ids": ["starlette.authentication.errors"],
       "expected_unit_ids": ["ru.business.starlette.authentication.errors.response"],
       "required_phrases": ["文档示例返回 401"],

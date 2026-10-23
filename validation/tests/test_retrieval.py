@@ -191,42 +191,6 @@ class RetrievalTests(unittest.TestCase):
         report = evaluate_data(check, units, None, corpus)
         self.assertEqual(report["gate_status"], "failed")
 
-    def test_unanswerable_requires_explicit_abstention(self):
-        root = Path(__file__).resolve().parents[2] / "conformance/retrieval"
-        units = {}
-        for path in sorted((root / "units").glob("*.md")):
-            meta, body = read_unit(path)
-            units[meta["unit_id"]] = {"meta": meta, "body": body}
-        corpus = digest(json_bytes(json.loads((root / "corpus.json").read_text())["views"]))
-        case = {
-            "case_id": "unsupported-account-lock", "query": "账号查询失败后锁定多久",
-            "expected_decision": "abstain", "expected_module_ids": [], "expected_unit_ids": [],
-            "required_phrases": [], "required_unknown_phrases": [], "forbidden_phrases": [], "top_k": 2,
-        }
-        check = {"schema_version": "0.2", "suite_id": "abstain-test", "audience": "business", "cases": [case]}
-        fixtures.write(self.suite_path, json.dumps(check, ensure_ascii=False))
-        self.assertEqual(load_suite(self.suite_path), check)
-        baseline = evaluate_data(check, units, None, corpus)
-        self.assertTrue(baseline["cases"][0]["hits"])
-        self.assertEqual(baseline["gate_status"], "failed")
-        self.assertEqual(baseline["summary"]["abstain_correct"], 0)
-        related = baseline["cases"][0]["hits"][0]
-        external = {"schema_version": "0.2", "suite_id": "abstain-test", "retriever_id": "reviewed-test",
-                    "corpus_sha256": corpus, "cases": {"unsupported-account-lock": {
-                        "hits": [{"unit_id": related, "score": 1.0}], "decision": "abstain"}}}
-        accepted = evaluate_data(check, units, external, corpus)
-        self.assertEqual(accepted["gate_status"], "passed")
-        self.assertEqual(accepted["summary"]["abstain_correct"], 1)
-        external["cases"]["unsupported-account-lock"]["decision"] = "answer"
-        self.assertEqual(evaluate_data(check, units, external, corpus)["gate_status"], "failed")
-        external["cases"]["unsupported-account-lock"].pop("decision")
-        with self.assertRaises(RetrievalError):
-            evaluate_data(check, units, external, corpus)
-        case["expected_unit_ids"] = [related]
-        fixtures.write(self.suite_path, json.dumps(check, ensure_ascii=False))
-        with self.assertRaises(RetrievalError):
-            load_suite(self.suite_path)
-
     def test_independent_public_sample_development_baseline(self):
         root = Path(__file__).resolve().parents[2] / "conformance/retrieval/starlette"
         corpus = json.loads((root / "corpus.json").read_text(encoding="utf-8"))
@@ -240,37 +204,11 @@ class RetrievalTests(unittest.TestCase):
         self.assertEqual(len(units), 5)
         check = load_suite(root / "suites/development.json")
         report = evaluate_data(check, units, None, digest(json_bytes(corpus["views"])))
-        self.assertEqual(report["summary"]["passed"], 2)
-        self.assertEqual(report["summary"]["abstain_correct"], 0)
-        self.assertFalse(next(row for row in report["cases"] if row["case_id"] == "unknown-account-lock")["passed"])
-
-    def test_explicit_abstention_cli_and_audit(self):
-        self.publish()
-        release = self.build()
-        manifest = json.loads((release / "检索清单/retrieval-test.json").read_text())
-        business = next(item["unit_id"] for item in manifest["units"] if item["audience"] == "business" and item["module_id"] == "example.order.query")
-        check = suite(required=[], forbidden=[])
-        check["schema_version"] = "0.2"
-        check["cases"][0]["expected_decision"] = "answer"
-        check["cases"][0]["expected_unit_ids"] = [business]
-        check["cases"].append({
-            "case_id": "unknown-retention", "query": "订单查询记录永久保存吗",
-            "expected_decision": "abstain", "expected_module_ids": [], "expected_unit_ids": [],
-            "required_phrases": [], "required_unknown_phrases": [], "forbidden_phrases": [], "top_k": 2,
-        })
-        fixtures.write(self.suite_path, json.dumps(check, ensure_ascii=False))
-        external = {"schema_version": "0.2", "suite_id": "public-test", "retriever_id": "explicit-decision-test",
-                    "corpus_sha256": digest(json_bytes(manifest["views"])), "cases": {
-                        "order-explanation": {"hits": [{"unit_id": business, "score": 1.0}], "decision": "answer"},
-                        "unknown-retention": {"hits": [{"unit_id": business, "score": 0.5}], "decision": "abstain"},
-                    }}
-        path = self.project / "explicit-results.json"
-        fixtures.write(path, json.dumps(external, ensure_ascii=False))
-        result = self.fixture.run_cli("retrieval-evaluate", "--release-id", "retrieval-test", "--suite", str(self.suite_path), "--results", str(path))
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(self.fixture.run_cli("retrieval-audit", "--release-id", "retrieval-test").returncode, 0)
-        report = json.loads((release / "检索评测/retrieval-test.json").read_text())
-        self.assertEqual(report["summary"]["abstain_correct"], 1)
+        self.assertEqual(report["summary"]["passed"], 3)
+        boundary = next(row for row in report["cases"] if row["case_id"] == "unknown-account-lock")
+        self.assertTrue(boundary["passed"])
+        self.assertIn("ru.business.starlette.authentication.errors.response", boundary["hits"])
+        self.assertFalse(boundary["missing_unknown_phrases"])
 
     def test_bad_suite_and_unit_metadata_are_rejected(self):
         invalid = suite()

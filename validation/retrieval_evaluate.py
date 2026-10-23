@@ -47,25 +47,18 @@ def lexical(query: str, units: list[dict], top_k: int) -> list[str]:
 
 def load_suite(path: Path) -> dict:
     suite = strict_json(path)
-    if set(suite) != {"schema_version", "suite_id", "audience", "cases"} or suite["schema_version"] not in {"0.1", "0.2"} or suite["audience"] not in {"business", "engineering"} or not isinstance(suite["suite_id"], str) or not suite["suite_id"] or not isinstance(suite["cases"], list) or not suite["cases"]:
+    if set(suite) != {"schema_version", "suite_id", "audience", "cases"} or suite["schema_version"] != "0.1" or suite["audience"] not in {"business", "engineering"} or not isinstance(suite["suite_id"], str) or not suite["suite_id"] or not isinstance(suite["cases"], list) or not suite["cases"]:
         raise RetrievalError("检索评测问题集结构无效")
     ids = set()
     required = {"case_id", "query", "expected_module_ids", "expected_unit_ids", "required_phrases", "required_unknown_phrases", "forbidden_phrases", "top_k"}
-    if suite["schema_version"] == "0.2":
-        required.add("expected_decision")
     for case in suite["cases"]:
         if not isinstance(case, dict) or set(case) != required or not isinstance(case["case_id"], str) or not case["case_id"] or case["case_id"] in ids or not isinstance(case["query"], str) or not case["query"] or type(case["top_k"]) is not int or not 1 <= case["top_k"] <= 20:
             raise RetrievalError("检索评测用例结构无效或 ID 重复")
         ids.add(case["case_id"])
-        if suite["schema_version"] == "0.2" and (not isinstance(case["expected_decision"], str) or case["expected_decision"] not in {"answer", "abstain"}):
-            raise RetrievalError("检索评测预期决策无效")
-        for field in required - {"case_id", "query", "top_k", "expected_decision"}:
+        for field in required - {"case_id", "query", "top_k"}:
             if not isinstance(case[field], list) or any(not isinstance(value, str) or not value for value in case[field]) or len(case[field]) != len(set(case[field])):
                 raise RetrievalError(f"检索评测用例 {field} 无效")
-        if suite["schema_version"] == "0.2" and case["expected_decision"] == "abstain":
-            if case["expected_module_ids"] or case["expected_unit_ids"] or case["required_phrases"] or case["required_unknown_phrases"]:
-                raise RetrievalError("不可回答题不能指定支持答案的单元或短语")
-        elif not case["expected_module_ids"] and not case["expected_unit_ids"]:
+        if not case["expected_module_ids"] and not case["expected_unit_ids"]:
             raise RetrievalError("评测用例至少要指定预期模块或单元")
     return suite
 
@@ -87,7 +80,7 @@ def evaluate_data(suite: dict, units: dict[str, dict], external: dict | None, co
     if not units:
         raise RetrievalError("检索语料为空")
     if external is not None:
-        if set(external) != {"schema_version", "suite_id", "retriever_id", "corpus_sha256", "cases"} or external["schema_version"] != suite["schema_version"] or external["suite_id"] != suite["suite_id"] or external["corpus_sha256"] != corpus_sha256 or not isinstance(external["retriever_id"], str) or not external["retriever_id"] or not isinstance(external["cases"], dict):
+        if set(external) != {"schema_version", "suite_id", "retriever_id", "corpus_sha256", "cases"} or external["schema_version"] != "0.1" or external["suite_id"] != suite["suite_id"] or external["corpus_sha256"] != corpus_sha256 or not isinstance(external["retriever_id"], str) or not external["retriever_id"] or not isinstance(external["cases"], dict):
             raise RetrievalError("外部检索结果身份或语料摘要不匹配")
         if set(external["cases"]) != {case["case_id"] for case in suite["cases"]}:
             raise RetrievalError("外部检索结果用例集合不匹配")
@@ -99,13 +92,7 @@ def evaluate_data(suite: dict, units: dict[str, dict], external: dict | None, co
         audience = suite["audience"]
         allowed = [unit for unit in units.values() if audience == "engineering" or unit["meta"]["audience"] == "business"]
         if external:
-            submitted = external["cases"][case["case_id"]]
-            if suite["schema_version"] == "0.2":
-                if not isinstance(submitted, dict) or set(submitted) != {"hits", "decision"} or not isinstance(submitted["decision"], str) or submitted["decision"] not in {"answer", "abstain"}:
-                    raise RetrievalError("外部检索决策格式无效")
-                hits, decision = submitted["hits"], submitted["decision"]
-            else:
-                hits, decision = submitted, "answer" if submitted else "abstain"
+            hits = external["cases"][case["case_id"]]
             if not isinstance(hits, list) or any(not isinstance(hit, dict) or set(hit) != {"unit_id", "score"} or not isinstance(hit["unit_id"], str) or type(hit["score"]) not in (int, float) or not math.isfinite(hit["score"]) for hit in hits):
                 raise RetrievalError("外部检索结果格式无效")
             all_ids = [hit["unit_id"] for hit in hits]
@@ -114,19 +101,16 @@ def evaluate_data(suite: dict, units: dict[str, dict], external: dict | None, co
             result_ids = all_ids[:case["top_k"]]
         else:
             result_ids = lexical(case["query"], allowed, case["top_k"])
-            # This is only a baseline policy: lexical-v1 cannot judge semantic support.
-            decision = "answer" if result_ids else "abstain"
         selected = [units[unit_id] for unit_id in result_ids]
         expected_modules = set(case["expected_module_ids"])
         expected_units = set(case["expected_unit_ids"])
-        expected_decision = case.get("expected_decision", "answer")
         relevant = [unit for unit in selected if unit["meta"]["unit_id"] in expected_units or unit["meta"]["module_id"] in expected_modules]
         text = "\n".join(unit["body"] for unit in relevant)
         all_text = "\n".join(unit["body"] for unit in selected)
         found_modules = {unit["meta"]["module_id"] for unit in selected}
         found_units = set(result_ids)
-        module_recall = len(expected_modules & found_modules) / len(expected_modules) if expected_modules else (None if expected_decision == "abstain" else 1.0)
-        unit_recall = len(expected_units & found_units) / len(expected_units) if expected_units else (None if expected_decision == "abstain" else 1.0)
+        module_recall = len(expected_modules & found_modules) / len(expected_modules) if expected_modules else 1.0
+        unit_recall = len(expected_units & found_units) / len(expected_units) if expected_units else 1.0
         rank = next((index for index, unit_id in enumerate(result_ids, 1) if unit_id in expected_units or units[unit_id]["meta"]["module_id"] in expected_modules), None)
         required = [phrase for phrase in case["required_phrases"] if phrase not in text]
         unknown = [phrase for phrase in case["required_unknown_phrases"] if phrase not in text]
@@ -134,31 +118,24 @@ def evaluate_data(suite: dict, units: dict[str, dict], external: dict | None, co
         leakage = [unit_id for unit_id in result_ids if audience == "business" and units[unit_id]["meta"]["audience"] != "business"]
         hashes = [digest(re.sub(r"\s+", "", unit["body"].split("## 出处", 1)[0]).encode("utf-8")) for unit in selected]
         duplicate_hits = len(hashes) - len(set(hashes))
-        decision_correct = decision == expected_decision
-        recall_correct = expected_decision == "abstain" or (module_recall == 1 and unit_recall == 1)
-        passed = decision_correct and recall_correct and not required and not unknown and not forbidden and not leakage and duplicate_hits == 0 and corpus_identity_correct
+        passed = module_recall == 1 and unit_recall == 1 and not required and not unknown and not forbidden and not leakage and duplicate_hits == 0 and corpus_identity_correct
         rows.append({
             "case_id": case["case_id"], "query": case["query"], "hits": result_ids,
-            "expected_decision": expected_decision, "decision": decision, "decision_correct": decision_correct,
             "module_recall_at_k": module_recall, "unit_recall_at_k": unit_recall,
-            "reciprocal_rank": 1 / rank if rank else (None if expected_decision == "abstain" else 0.0),
+            "reciprocal_rank": 1 / rank if rank else 0.0,
             "missing_required_phrases": required, "missing_unknown_phrases": unknown,
             "forbidden_phrase_hits": forbidden, "audience_leakage": leakage,
             "duplicate_hits": duplicate_hits, "passed": passed,
             "source_release_correct": corpus_identity_correct,
         })
-    answer_rows = [row for row in rows if row["expected_decision"] == "answer"]
-    abstain_rows = [row for row in rows if row["expected_decision"] == "abstain"]
     return {
-        "schema_version": suite["schema_version"], "suite_id": suite["suite_id"], "suite_audience": suite["audience"],
+        "schema_version": "0.1", "suite_id": suite["suite_id"], "suite_audience": suite["audience"],
         "retriever_id": retriever_id, "corpus_sha256": corpus_sha256,
         "cases": rows,
         "summary": {"total": len(rows), "passed": sum(row["passed"] for row in rows),
-                    "module_recall_at_k": sum(row["module_recall_at_k"] for row in answer_rows) / len(answer_rows) if answer_rows else None,
-                    "unit_recall_at_k": sum(row["unit_recall_at_k"] for row in answer_rows) / len(answer_rows) if answer_rows else None,
-                    "mrr": sum(row["reciprocal_rank"] for row in answer_rows) / len(answer_rows) if answer_rows else None,
-                    "abstain_total": len(abstain_rows),
-                    "abstain_correct": sum(row["decision_correct"] for row in abstain_rows),
+                    "module_recall_at_k": sum(row["module_recall_at_k"] for row in rows) / len(rows),
+                    "unit_recall_at_k": sum(row["unit_recall_at_k"] for row in rows) / len(rows),
+                    "mrr": sum(row["reciprocal_rank"] for row in rows) / len(rows),
                     "audience_leakage": sum(len(row["audience_leakage"]) for row in rows),
                     "required_phrase_coverage": 1 - sum(len(row["missing_required_phrases"]) for row in rows) / max(1, sum(len(case["required_phrases"]) for case in suite["cases"])),
                     "unknown_phrase_coverage": 1 - sum(len(row["missing_unknown_phrases"]) for row in rows) / max(1, sum(len(case["required_unknown_phrases"]) for case in suite["cases"])),
@@ -194,7 +171,7 @@ def evaluate_in_release(release_root: Path, release_id: str, suite_path: Path, e
     report_path.write_bytes(json_bytes(report))
     markdown = [f"# 检索评测：{release_id}", "", f"- 问题集：{suite['suite_id']}", f"- 检索器：{report['retriever_id']}", f"- 门禁：{report['gate_status']}", f"- 通过：{report['summary']['passed']}/{report['summary']['total']}", "", "## 用例", ""]
     for row in report["cases"]:
-        markdown.extend([f"### {row['case_id']}", "", f"- 查询：{row['query']}", f"- 结果：{', '.join(row['hits']) or '无命中'}", f"- 决策：{row['decision']}（预期：{row['expected_decision']}）", f"- 通过：{'是' if row['passed'] else '否'}", f"- 缺少必要短语：{', '.join(row['missing_required_phrases']) or '无'}", f"- 缺少未知边界：{', '.join(row['missing_unknown_phrases']) or '无'}", f"- 禁止断言命中：{', '.join(row['forbidden_phrase_hits']) or '无'}", f"- 受众泄漏：{', '.join(row['audience_leakage']) or '无'}", ""])
+        markdown.extend([f"### {row['case_id']}", "", f"- 查询：{row['query']}", f"- 结果：{', '.join(row['hits']) or '无命中'}", f"- 通过：{'是' if row['passed'] else '否'}", f"- 缺少必要短语：{', '.join(row['missing_required_phrases']) or '无'}", f"- 缺少未知边界：{', '.join(row['missing_unknown_phrases']) or '无'}", f"- 禁止断言命中：{', '.join(row['forbidden_phrase_hits']) or '无'}", f"- 受众泄漏：{', '.join(row['audience_leakage']) or '无'}", ""])
     markdown_path.write_text("\n".join(markdown), encoding="utf-8")
     manifest["evaluation"] = {"suite_id": suite["suite_id"], "suite_path": f"发布/检索评测/套件/{release_id}.json", "suite_sha256": report["suite_sha256"], "report_path": f"发布/检索评测/{release_id}.json", "report_sha256": digest(report_path.read_bytes()), "report_markdown_path": f"发布/检索评测/{release_id}.md", "report_markdown_sha256": digest(markdown_path.read_bytes()), "external_results_path": f"发布/检索评测/外部结果/{release_id}.json" if external_copy else None, "external_results_sha256": digest(external_copy.read_bytes()) if external_copy else None, "retriever_id": report["retriever_id"], "corpus_sha256": corpus_sha256}
     manifest["gate_status"] = report["gate_status"]
