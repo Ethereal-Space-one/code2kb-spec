@@ -4,7 +4,7 @@
 
 Code2KB Spec 是一套把固定源码提交转换为可追溯、可审核、可发布知识库的开放规范，并提供 Python 参考实现、AI Agent Skill、模板和技术栈适配器。
 
-> 工程版本：`0.3.0`；知识规范版本：`0.8.3`。两者独立演进。
+> 当前开源工程候选版本：`0.4.0`。知识文件协议的兼容标识见[版本管理](docs/versioning.md)，不与任何使用本工具的知识库项目同步编号。
 
 ## 三层结构
 
@@ -33,6 +33,7 @@ cd code2kb-spec
 python3 -B -m unittest discover -s validation/tests -q
 python3 -B scripts/check_spec_ids.py
 python3 -B scripts/check_conformance.py --check-expected
+python3 -B scripts/check_retrieval_scale.py
 ```
 
 可以安装本地命令：
@@ -67,13 +68,16 @@ code2kb check --project-root /path/to/knowledge-project
 
 完整命令和发布流程见[使用指南](docs/usage.md)。
 
-## 0.3.0 新能力
+## 0.4.0 新能力
 
-- 完整、独立于参考实现源码的元数据协议；
-- 61 条规范要求到测试、夹具或示例的显式覆盖表；
-- 可供其他语言实现复用的一致性夹具和确定性报告；
-- 第三方实现兼容声明模板与版本兼容说明；
-- 通过 Pull Request、受保护分支和 CI 管理公开发布。
+- 从已审核双版生成按主题切分、受众隔离的 Markdown 检索单元；
+- 独立检索清单、轻量路由索引、基础版本摘要绑定和篡改审计；
+- 对已审计的当前检索发布物执行只读查询，返回候选证据及双版正文出处；
+- 无外部依赖的离线检索评测，支持导入外部检索结果；
+- 可选 `compact` 正文模式与 full/compact 主题覆盖对照；
+- Agent Skill 按核心契约、当前任务和可选扩展加载。
+
+检索扩展的[产物契约](docs/retrieval-contract.md)与[评测手顺](docs/retrieval-evaluation.md)独立维护。默认发布行为保持双版；只有显式启用检索扩展时才产生检索就绪指针。
 
 ## 能力边界
 
@@ -100,7 +104,7 @@ code2kb check --project-root /path/to/knowledge-project
 └── docs/                          # 教程和实现说明
 ```
 
-版本规则见[版本管理](docs/versioning.md)，升级关系见[兼容性说明](docs/compatibility.md)，本版验证结果见[0.3.0 开源审计](docs/open-source-audit.md)，后续方向见 [ROADMAP](ROADMAP.md)。
+版本规则见[版本管理](docs/versioning.md)，升级关系见[兼容性说明](docs/compatibility.md)，本版验证结果见[0.4.0 开源审计](docs/open-source-audit-0.4.0.md)，后续方向见 [ROADMAP](ROADMAP.md)。
 
 ## 参与贡献
 

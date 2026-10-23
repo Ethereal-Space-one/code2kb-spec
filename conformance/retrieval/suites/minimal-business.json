@@ -1,0 +1,47 @@
+{
+  "schema_version": "0.1",
+  "suite_id": "minimal-business-v1",
+  "audience": "business",
+  "cases": [
+    {
+      "case_id": "order-query-result",
+      "query": "订单查询失败时会怎样，有延迟吗",
+      "expected_module_ids": ["example.order.query"],
+      "expected_unit_ids": ["ru.business.example.order.query.faq.result"],
+      "required_phrases": ["显示错误提示"],
+      "required_unknown_phrases": ["仍不能确定"],
+      "forbidden_phrases": ["线上已经验证"],
+      "top_k": 2
+    },
+    {
+      "case_id": "order-query-failure",
+      "query": "订单编号不存在怎么办，能重试吗",
+      "expected_module_ids": ["example.order.query"],
+      "expected_unit_ids": ["ru.business.example.order.query.rules.failure"],
+      "required_phrases": ["提示未找到订单"],
+      "required_unknown_phrases": ["仍不能确定"],
+      "forbidden_phrases": ["订单一定已被删除"],
+      "top_k": 2
+    },
+    {
+      "case_id": "account-same-name-topic",
+      "query": "账号查询会显示什么资料",
+      "expected_module_ids": ["example.account.query"],
+      "expected_unit_ids": ["ru.business.example.account.query.faq.result"],
+      "required_phrases": ["当前账号的公开资料"],
+      "required_unknown_phrases": [],
+      "forbidden_phrases": ["所有账号资料"],
+      "top_k": 2
+    },
+    {
+      "case_id": "account-unauthorized",
+      "query": "我能查看别人的账号资料吗",
+      "expected_module_ids": ["example.account.query"],
+      "expected_unit_ids": ["ru.business.example.account.query.rules.access"],
+      "required_phrases": ["没有查看其他账号资料的入口"],
+      "required_unknown_phrases": ["尚未验证"],
+      "forbidden_phrases": ["已经确认拥有跨账号访问权限"],
+      "top_k": 2
+    }
+  ]
+}

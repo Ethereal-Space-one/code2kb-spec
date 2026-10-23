@@ -631,8 +631,9 @@ class Governance:
             candidates = [doc for doc in candidates if doc.relative.relative_to(spec.relative.parent).as_posix() in requested]
             if len(candidates) != len(requested):
                 raise ValueError("--files 含不存在、非当前或不能发布的文件")
-        if not {"overview", "scope"} <= {doc.doc_type for doc in candidates}:
-            raise ValueError("模块发布包至少包含模块概览和功能与范围")
+        required = {"overview", "scope"} if self.config.get("_content_profile") != "compact" else {"overview", "rules", "faq"}
+        if not required <= {doc.doc_type for doc in candidates}:
+            raise ValueError(f"模块发布包缺少 {sorted(required - {doc.doc_type for doc in candidates})}；请核对 full/compact profile")
         chosen = {doc.relative for doc in candidates}
         prospective = [replace(doc, meta={**doc.meta, "review_status": "reviewed" if doc.relative in chosen else "draft"}) if doc.module_id == module_id and doc.doc_type in self.core.BUSINESS | self.core.ENGINEERING else doc for doc in self.docs]
         self.core.validate_project(prospective, self.outline, self.config, self.core.registered_adapter_entries(self.config))
@@ -651,7 +652,7 @@ class Governance:
         technical = {doc.doc_type: doc for doc in candidates if doc.doc_type in self.core.ENGINEERING}
         if technical and "implementation" not in technical:
             raise ValueError("研发发布包缺少技术实现导航")
-        if "implementation" in technical and ((apis and "api_catalog" not in technical) or (methods and "method_catalog" not in technical)):
+        if "implementation" in technical and ((apis and "api_catalog" not in technical) or (methods and "method_catalog" not in technical and self.config.get("_content_profile") != "compact")):
             raise ValueError("研发发布包不能遗漏规格已有的接口或方法正文")
         for doc in technical.values():
             if self.core.document_revisions(doc, self.config) != self.core.document_revisions(spec, self.config):

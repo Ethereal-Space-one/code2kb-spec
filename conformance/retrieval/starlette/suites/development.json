@@ -1,0 +1,37 @@
+{
+  "schema_version": "0.1",
+  "suite_id": "starlette-dev-61123a5",
+  "audience": "business",
+  "cases": [
+    {
+      "case_id": "http-default-permission",
+      "query": "使用内置权限检查的网页接口，权限不够时默认会看到什么？",
+      "expected_module_ids": ["starlette.authentication.http"],
+      "expected_unit_ids": ["ru.business.starlette.authentication.http.permission"],
+      "required_phrases": ["默认返回 403"],
+      "required_unknown_phrases": [],
+      "forbidden_phrases": ["404 是默认结果"],
+      "top_k": 2
+    },
+    {
+      "case_id": "debug-server-error",
+      "query": "打开调试后，服务器出错还会显示我配置的 500 错误页吗？",
+      "expected_module_ids": ["starlette.exceptions.debug"],
+      "expected_unit_ids": ["ru.business.starlette.exceptions.debug.response"],
+      "required_phrases": ["而不是使用已安装的 500 错误处理器"],
+      "required_unknown_phrases": [],
+      "forbidden_phrases": ["所有 HTTP 异常一律返回 traceback"],
+      "top_k": 2
+    },
+    {
+      "case_id": "unknown-account-lock",
+      "query": "认证失败几次后会锁定账号，锁多久？",
+      "expected_module_ids": ["starlette.authentication.errors"],
+      "expected_unit_ids": ["ru.business.starlette.authentication.errors.response"],
+      "required_phrases": [],
+      "required_unknown_phrases": ["没有给出账号失败后锁定多久的规则"],
+      "forbidden_phrases": ["锁定 30 分钟"],
+      "top_k": 2
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "cases": {
+    "account-same-name-topic": [
+      {
+        "score": 1.0,
+        "unit_id": "ru.business.example.account.query.faq.result"
+      }
+    ],
+    "account-unauthorized": [
+      {
+        "score": 1.0,
+        "unit_id": "ru.business.example.account.query.rules.access"
+      }
+    ],
+    "order-query-failure": [
+      {
+        "score": 1.0,
+        "unit_id": "ru.business.example.order.query.rules.failure"
+      }
+    ],
+    "order-query-result": [
+      {
+        "score": 1.0,
+        "unit_id": "ru.business.example.order.query.faq.result"
+      }
+    ]
+  },
+  "corpus_sha256": "b06bd242bab2db4322d07906b99c112743ad69ad73b06265b452270a2c38780e",
+  "retriever_id": "example-external-v1",
+  "schema_version": "0.1",
+  "suite_id": "minimal-business-v1"
+}

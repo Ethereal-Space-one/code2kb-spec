@@ -1,6 +1,6 @@
 # Code2KB Spec 使用指南
 
-> 工程版本 `0.3.0`；知识规范 `0.8.3`。AI 的执行入口是 [`skills/extract-app-knowledge/SKILL.md`](../skills/extract-app-knowledge/SKILL.md)。
+> 工程版本 `0.4.0`；知识规范 `0.8.3`。AI 的执行入口是 [`skills/extract-app-knowledge/SKILL.md`](../skills/extract-app-knowledge/SKILL.md)。
 
 ## 工作方式
 
@@ -104,6 +104,20 @@ code2kb audit-release --project-root /项目
 ```
 
 准确参数和回退方式见[发布与维护](../skills/extract-app-knowledge/references/发布与维护.md)。
+
+## 可选检索扩展
+
+基础双版发布后，可按[检索扩展契约](retrieval-contract.md)构建单主题单元，并按[离线评测手顺](retrieval-evaluation.md)运行问题集。评测通过后才有 `发布/当前检索版本.json`；失败不改变基础版本指针。下次基础发布可显式使用 `publish --with-retrieval --retrieval-suite` 把检索门禁纳入同一临时快照。
+
+检索扩展通过审计后，可从**当前检索版本**只读查询候选证据：
+
+```bash
+code2kb retrieval-query --project-root /项目 --query "订单查询失败时会怎样" --audience business --top-k 3
+```
+
+返回 JSON 含 `release_id`、检索清单摘要、命中单元原文、单元路径及双版正文出处。`business` 只读取业务单元；`engineering` 可读取业务与研发单元。输出的 `answerability: not_assessed` 表示尚未判断证据能否回答问题；无命中也不自动构成最终拒答。此命令不修改发布物，也不生成机器人回复。未通过检索门禁或审计失败的发布物不可查询。
+
+`compact` 项目在根目录放独立 `Code2KB工程配置.json`，保留现有知识规范文件类型；它不能靠省略必要条件或未知来缩短正文。
 
 ## 重要边界
 

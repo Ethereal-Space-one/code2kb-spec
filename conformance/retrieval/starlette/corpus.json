@@ -1,0 +1,15 @@
+{
+  "schema_version": "0.1",
+  "source_commit": "61123a5c76ebb9d5786758008945c4fbbb380bf6",
+  "views": {
+    "business": {
+      "files": {
+        "auth-error.md": "4f73d2f88e38c6b10409e69537097de4aa635753c079dfd39aa91f652b3fb4f3",
+        "background-error.md": "ad89ed6d4284000239ade47b959adb275afd9862cc51260a9938500eaea8375c",
+        "debug-error.md": "36b35b4ae57c7e7bf180be1a1ead246837c6cc454f69b391107a636372958fe1",
+        "http-permission.md": "4a87c3ffe705a24c1e873462aa143314cefd4c90bdde40a4ec5c11ad63a6de68",
+        "websocket-permission.md": "69d8628ca0cfd680f1aca1fa37e5a64aacf74ca28df51a37f712e4f73f3c18e2"
+      }
+    }
+  }
+}
