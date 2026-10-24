@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
   "spec_version": "0.8.3",
-  "implementation_version": "0.4.0",
+  "implementation_version": "0.5.0",
   "requirements_total": 61,
   "requirements_covered": 61,
   "cases_total": 3,

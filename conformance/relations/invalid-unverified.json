@@ -1,0 +1,12 @@
+{
+  "schema_version": "0.1",
+  "module_id": "example.query",
+  "topics": [
+    {"topic_id": "topic.query.result", "audience": "business", "source_document": "常见问答.md", "source_heading": "查询结果"}
+  ],
+  "nodes": [],
+  "links": [
+    {"from_type": "fact", "from_id": "F-01", "to_type": "topic", "to_id": "topic.query.result", "status": "verified", "evidence": [], "reviewed_by": "Fixture reviewer", "reviewed_at": "2026-10-24"}
+  ],
+  "identity_history": []
+}

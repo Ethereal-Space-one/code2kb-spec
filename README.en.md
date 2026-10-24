@@ -4,7 +4,7 @@
 
 Code2KB Spec is an open specification for turning fixed source revisions into traceable, reviewable, and publishable knowledge bases. The repository also provides a Python reference implementation, an AI agent skill, templates, and stack adapters.
 
-> Current open-source project candidate: `0.4.0`. The knowledge file protocol has its own compatibility identifier; it does not follow the version of any project using this tool.
+> Current project version: `0.5.0`. The knowledge file protocol has its own compatibility identifier; it does not follow the version of any project using this tool.
 
 ## Three layers
 
@@ -47,6 +47,10 @@ See the [Chinese README](README.md) and [usage guide](docs/usage.md) for the com
 - task-scoped Agent Skill contracts with optional extensions.
 
 See the [retrieval contract](docs/retrieval-contract.md) and [evaluation guide](docs/retrieval-evaluation.md). The default two-view release remains unchanged.
+
+## What's new in 0.5.0
+
+The optional [relation and evidence extension](docs/relation-contract.md) adds fixed-commit excerpt rebuilding, reviewed fact-to-topic links, coverage reports, and conservative TypeScript/Java candidates. Candidates do not become business facts automatically. See the [implementation plan](docs/0.5.0-implementation-plan.md) and [independent public evidence check](docs/0.5.0-public-evidence-check.md) for scope and validation limits.
 
 ## Boundaries
 

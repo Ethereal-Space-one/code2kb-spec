@@ -9,7 +9,10 @@ import re
 
 
 ROOT = Path(__file__).resolve().parents[1]
-TEXT_SUFFIXES = {".md", ".py", ".json", ".yml", ".yaml", ".toml", ".txt", ""}
+TEXT_SUFFIXES = {
+    ".md", ".py", ".json", ".yml", ".yaml", ".toml", ".txt", "",
+    ".java", ".ts", ".tsx", ".vue", ".js", ".jsx",
+}
 LOCAL_DENYLIST = ROOT / ".code2kb-public-denylist"
 SKIP_DIRS = {".git", ".venv", "venv", "build", "dist", "__pycache__", ".pytest_cache", ".mypy_cache"}
 FORBIDDEN = {

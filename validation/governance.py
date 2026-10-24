@@ -13,12 +13,19 @@ import subprocess
 from types import SimpleNamespace
 from urllib.parse import quote
 
+try:
+    from . import relation_model, fact_render
+except ImportError:
+    import relation_model, fact_render
+
 
 FILES_HEADER = "| 文件 | document_type | 内容摘要 |"
 CLAIMS_HEADER = "| fact_id | 知识文件 | 结论摘要 | 文件摘要 | 复核结果 |"
 MATCH_HEADER = "| api_id | 匹配状态 | 调用方证据 | 服务方证据 | 部署配对 | 差异或边界 |"
 AUDIENCE_HEADER = "| entry_id | 受众 | 范围 |"
 FACT_HEADER = "| fact_id | 单一结论与条件 | 证据等级 | 固定提交锚点 | 影响的知识文件 |"
+RELATION_HEADER = "| 文件 | 内容摘要 |"
+RELATION_REVIEW_HEADER = "| 文件 | 内容摘要 | 复核结果 |"
 SHA = re.compile(r"[0-9a-f]{64}\Z")
 RELEASE_ID = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,79}\Z")
 EVIDENCE_ID = re.compile(r"EVID-[A-Za-z0-9-]+\Z")
@@ -157,6 +164,7 @@ class Governance:
         self.evidence_dependencies = {}
         self.policy_inputs = set()
         self.module_reviews = {}
+        self.relations = {}
         self.release_root = project / "发布"
         if self.release_root.is_symlink():
             raise ValueError("发布治理目录不能是符号链接")
@@ -494,6 +502,30 @@ class Governance:
     def bound_evidence_ids(self, module_id):
         return set(self.evidence_dependencies.get(module_id, set()))
 
+    def validate_relations(self):
+        specs = [doc for doc in self.docs if doc.doc_type == "spec"]
+        qualified_facts = {
+            f"{spec.module_id}#{row[0]}"
+            for spec in specs
+            for row in self.core.table_rows(spec.body, "## 入口与调用链", FACT_HEADER)
+        }
+        for spec in specs:
+            loaded = relation_model.load(self.source, spec)
+            if loaded is None:
+                continue
+            data, raw = loaded
+            known, derived, matches = relation_model.catalog(self.core, spec, self.outline)
+            external_facts = {value for value in qualified_facts if not value.startswith(f"{spec.module_id}#")}
+            validation_known = {**known, "fact": known["fact"] | external_facts}
+            relation_model.validate(data, known=validation_known, module_dir=self.source / spec.relative.parent, repositories=self.config["repositories"])
+            links = relation_model.merged_links(data, derived, matches)
+            path = relation_model.mapping_path(self.source, spec)
+            self.scan_sensitive_files([path])
+            self.relations[spec.module_id] = {
+                "path": path, "data": data, "raw": raw, "links": links, "sha256": digest(raw),
+                "coverage": relation_model.coverage(spec.module_id, known, data["topics"], links),
+            }
+
     def validate_matches(self, for_publish=False):
         cache = {}
         released_modules = {doc.module_id for doc in self.docs if doc.publishable}
@@ -522,10 +554,12 @@ class Governance:
 
     def expected_claims(self, spec):
         rows = self.core.table_rows(spec.body, "## 入口与调用链", FACT_HEADER)
+        normalized = fact_render.normalized_facts(spec, self.core)
         targets = {}
         for row in rows:
             fact_id, _, _, _, affected = row
-            fingerprint = digest(json.dumps(row, ensure_ascii=False, separators=(",", ":")))
+            fingerprint_input = [row, normalized[fact_id]] if fact_id in normalized else row
+            fingerprint = digest(json.dumps(fingerprint_input, ensure_ascii=False, separators=(",", ":"), sort_keys=True))
             for local in re.split(r"[、,，]", affected):
                 local = local.strip().strip("`")
                 if not self.core.safe_repo_path(local) or not local.endswith(".md"):
@@ -555,6 +589,11 @@ class Governance:
                     queue.append({"module_id": spec.module_id, "fact_id": key[0], "file": key[1], "reason": reason})
             for key in stored.keys() - expected.keys():
                 queue.append({"module_id": spec.module_id, "fact_id": key[0], "file": key[1], "reason": "结论或影响关系已删除，需复核删除影响"})
+            relation = self.relations.get(spec.module_id)
+            recorded = self.core.table_rows(spec.body, "## 关系复核", RELATION_REVIEW_HEADER) if "## 关系复核" in spec.body else []
+            expected_relation = [["关系映射.json", relation["sha256"], "已复核"]] if relation else []
+            if recorded != expected_relation:
+                queue.append({"module_id": spec.module_id, "fact_id": "RELATION", "file": "关系映射.json", "reason": "关系映射新增、删除或变化，需复核"})
         return queue
 
     def confirm_claims(self, module_id):
@@ -564,7 +603,14 @@ class Governance:
             raise ValueError("受影响知识文件未生成；先完成正文再记录语义复核")
         section = "## 结论复核\n\n" + CLAIMS_HEADER + "\n| --- | --- | --- | --- | --- |\n"
         section += "\n".join("| " + " | ".join(row) + " |" for _, row in sorted(rows.items()))
-        atomic_write(self.source / spec.relative, replace_section(spec.original, "## 结论复核", section))
+        updated = replace_section(spec.original, "## 结论复核", section)
+        relation = self.relations.get(module_id)
+        if relation or "## 关系复核" in spec.body:
+            review = "## 关系复核\n\n" + RELATION_REVIEW_HEADER + "\n| --- | --- | --- |\n"
+            if relation:
+                review += f"| 关系映射.json | {relation['sha256']} | 已复核 |\n"
+            updated = replace_section(updated, "## 关系复核", review)
+        atomic_write(self.source / spec.relative, updated)
         return {"module_id": module_id, "claim_projections": len(rows), "note": "仅记录已完成的 AI 语义复核；摘要不证明自然语言正确"}
 
     def manifest_rows(self, manifest):
@@ -585,6 +631,11 @@ class Governance:
                 if heading == "## 审核依据" and doc_type not in {"spec", "questions"}:
                     raise ValueError(f"审核依据类型无效：{relative}")
                 result[path] = (doc, heading)
+        relation = self.relations.get(manifest.module_id)
+        relation_rows = self.core.table_rows(manifest.body, "## 关系依据", RELATION_HEADER) if "## 关系依据" in manifest.body else []
+        expected_relation = [["关系映射.json", relation["sha256"]]] if relation else []
+        if relation_rows != expected_relation:
+            raise ValueError("发布清单关系依据已变化；重新准备模块发布包")
         required = {doc.relative for doc in self.module_docs(manifest.module_id) if doc.doc_type in {"spec", "questions"}}
         actual = {doc.relative for doc, heading in result.values() if heading == "## 审核依据"}
         if actual != required:
@@ -675,6 +726,10 @@ class Governance:
                 local = doc.relative.relative_to(spec.relative.parent).as_posix()
                 text += f"| {local} | {doc.doc_type} | {content_digest(doc.original)} |\n"
             text += "\n"
+        relation = self.relations.get(module_id)
+        if relation:
+            text += "## 关系依据\n\n" + RELATION_HEADER + "\n| --- | --- |\n"
+            text += f"| 关系映射.json | {relation['sha256']} |\n\n"
         text += "## 运行依据\n\n| evidence_id | 文件 | 内容摘要 |\n| --- | --- | --- |\n"
         for evidence_id in sorted(self.bound_evidence_ids(module_id)):
             item = self.evidence[evidence_id]
@@ -821,6 +876,7 @@ class Governance:
         evidence_ids = set().union(*(self.bound_evidence_ids(module_id) for module_id in modules)) if modules else set()
         paths.update(self.evidence[evidence_id]["path"] for evidence_id in evidence_ids)
         paths.update(self.policy_inputs)
+        paths.update(item["path"] for module_id, item in self.relations.items() if module_id in modules)
         for path in sorted(paths):
             local = path.relative_to(self.project).as_posix()
             saved = subprocess.run(["git", "-C", str(self.project), "show", f"{commit}:{local}"], capture_output=True)
