@@ -1,6 +1,6 @@
 # Code2KB Spec 使用指南
 
-> 工程版本 `0.4.0`；知识规范 `0.8.3`。AI 的执行入口是 [`skills/extract-app-knowledge/SKILL.md`](../skills/extract-app-knowledge/SKILL.md)。
+> 工程版本 `0.6.0`；知识规范 `0.8.3`。AI 的执行入口是 [`skills/extract-app-knowledge/SKILL.md`](../skills/extract-app-knowledge/SKILL.md)。
 
 ## 工作方式
 
@@ -120,6 +120,8 @@ code2kb retrieval-query --project-root /项目 --query "订单查询失败时会
 `compact` 项目在根目录放独立 `Code2KB工程配置.json`，保留现有知识规范文件类型；它不能靠省略必要条件或未知来缩短正文。
 
 ## 重要边界
+
+可选的持久运行账本、批次任务、恢复命令及 Claude Code 薄适配见[0.6 本地接续执行器](0.6.0-runner.md)。旧知识项目无需启用账本。
 
 - `check` 验证结构和固定锚点，不证明自然语言正确。
 - `confirm-claims` 记录已经完成的语义复核，不执行语义判断。
