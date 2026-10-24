@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import subprocess
 import sys
 import unittest
 
@@ -158,6 +159,20 @@ class RetrievalTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(self.fixture.run_cli("audit-release", "--release-id", "retrieval-test").returncode, 0)
         self.assertEqual(self.fixture.run_cli("retrieval-audit", "--release-id", "retrieval-test").returncode, 0)
+
+    def test_failed_second_release_keeps_previous_retrieval_pointer(self):
+        first = self.fixture.run_cli("publish", "--release-id", "retrieval-v1", "--with-retrieval", "--retrieval-suite", str(self.suite_path))
+        self.assertEqual(first.returncode, 0, first.stderr)
+        pointer = (self.project / "发布/当前检索版本.json").read_bytes()
+        manifest = (self.project / "发布/检索清单/retrieval-v1.json").read_bytes()
+        subprocess.run(["git", "-C", str(self.project), "add", "发布"], check=True)
+        subprocess.run(["git", "-C", str(self.project), "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-q", "-m", "retrieval v1"], check=True)
+        fixtures.write(self.suite_path, json.dumps(suite(required=["从未出现的测试词"]), ensure_ascii=False))
+        failed = self.fixture.run_cli("publish", "--release-id", "retrieval-v2", "--with-retrieval", "--retrieval-suite", str(self.suite_path))
+        self.assertNotEqual(failed.returncode, 0)
+        self.assertEqual((self.project / "发布/当前检索版本.json").read_bytes(), pointer)
+        self.assertEqual((self.project / "发布/检索清单/retrieval-v1.json").read_bytes(), manifest)
+        self.assertEqual(self.fixture.run_cli("retrieval-audit", "--release-id", "retrieval-v1").returncode, 0)
 
     def test_compact_project_uses_existing_document_types(self):
         fixtures.write(self.project / "Code2KB工程配置.json", json.dumps({"schema_version": "0.1", "content_profile": "compact"}))

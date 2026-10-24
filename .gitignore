@@ -108,6 +108,7 @@ celerybeat.pid
 # Environments
 .env
 .code2kb-public-denylist
+.code2kb/
 .venv
 env/
 venv/

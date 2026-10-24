@@ -14,9 +14,9 @@ from types import SimpleNamespace
 from urllib.parse import quote
 
 try:
-    from . import relation_model, fact_render
+    from . import relation_model, fact_render, run_state
 except ImportError:
-    import relation_model, fact_render
+    import relation_model, fact_render, run_state
 
 
 FILES_HEADER = "| 文件 | document_type | 内容摘要 |"
@@ -99,6 +99,7 @@ def atomic_write(path: Path, value: str) -> None:
     temp = path.with_name(path.name + ".tmp")
     if temp.exists() or temp.is_symlink():
         raise ValueError(f"发现未处理的临时治理文件：{temp}")
+    run_state.record_governance_write(path, value.encode("utf-8"))
     try:
         with temp.open("x", encoding="utf-8") as stream:
             stream.write(value)
@@ -571,6 +572,41 @@ class Governance:
                 targets[(fact_id, local)] = [fact_id, local, fingerprint, content_digest(doc.original) if doc else "缺失", "已复核"]
         return targets
 
+    def cross_module_fact_digest(self, module_id):
+        """Fingerprint only explicitly referenced foreign facts, never similar text."""
+        relation = self.relations.get(module_id)
+        if not relation:
+            return None
+        references = sorted({
+            link["from_id"] for link in relation["data"]["links"]
+            if link["from_type"] == "fact" and link["to_type"] == "topic" and "#" in link["from_id"]
+        })
+        if not references:
+            return None
+        specs = {doc.module_id: doc for doc in self.docs if doc.doc_type == "spec"}
+        values = []
+        for reference in references:
+            owner, fact_id = reference.split("#", 1)
+            spec = specs.get(owner)
+            if spec is None:
+                values.append([reference, "MISSING_SPEC"])
+                continue
+            rows = {row[0]: row for row in self.core.table_rows(spec.body, "## 入口与调用链", FACT_HEADER)}
+            if fact_id not in rows:
+                values.append([reference, "MISSING_FACT"])
+                continue
+            normalized = fact_render.normalized_facts(spec, self.core)
+            values.append([reference, rows[fact_id], normalized.get(fact_id), spec.meta.get("source_revisions")])
+        return digest(json.dumps(values, ensure_ascii=False, separators=(",", ":"), sort_keys=True))
+
+    def expected_relation_reviews(self, module_id):
+        relation = self.relations.get(module_id)
+        rows = [["关系映射.json", relation["sha256"], "已复核"]] if relation else []
+        external = self.cross_module_fact_digest(module_id)
+        if external:
+            rows.append(["跨模块事实引用", external, "已复核"])
+        return rows
+
     def impacts(self, module_id=None):
         queue = []
         for spec in (doc for doc in self.docs if doc.doc_type == "spec" and (not module_id or doc.module_id == module_id)):
@@ -589,9 +625,8 @@ class Governance:
                     queue.append({"module_id": spec.module_id, "fact_id": key[0], "file": key[1], "reason": reason})
             for key in stored.keys() - expected.keys():
                 queue.append({"module_id": spec.module_id, "fact_id": key[0], "file": key[1], "reason": "结论或影响关系已删除，需复核删除影响"})
-            relation = self.relations.get(spec.module_id)
             recorded = self.core.table_rows(spec.body, "## 关系复核", RELATION_REVIEW_HEADER) if "## 关系复核" in spec.body else []
-            expected_relation = [["关系映射.json", relation["sha256"], "已复核"]] if relation else []
+            expected_relation = self.expected_relation_reviews(spec.module_id)
             if recorded != expected_relation:
                 queue.append({"module_id": spec.module_id, "fact_id": "RELATION", "file": "关系映射.json", "reason": "关系映射新增、删除或变化，需复核"})
         return queue
@@ -607,8 +642,8 @@ class Governance:
         relation = self.relations.get(module_id)
         if relation or "## 关系复核" in spec.body:
             review = "## 关系复核\n\n" + RELATION_REVIEW_HEADER + "\n| --- | --- | --- |\n"
-            if relation:
-                review += f"| 关系映射.json | {relation['sha256']} | 已复核 |\n"
+            for row in self.expected_relation_reviews(module_id):
+                review += "| " + " | ".join(row) + " |\n"
             updated = replace_section(updated, "## 关系复核", review)
         atomic_write(self.source / spec.relative, updated)
         return {"module_id": module_id, "claim_projections": len(rows), "note": "仅记录已完成的 AI 语义复核；摘要不证明自然语言正确"}
