@@ -18,13 +18,17 @@ from urllib.parse import unquote
 
 try:
     from .adapters.uniapp_pages import read_uniapp_pages
+    from .adapters.ts_java import scan as scan_candidates
+    from .evidence_snapshot import snapshot as source_snapshot
     from .governance import Governance, json_text, atomic_write, digest, scan_business_terms
-    from . import retrieval_build, retrieval_evaluate, retrieval_audit, retrieval_profile, retrieval_query
+    from . import retrieval_build, retrieval_evaluate, retrieval_audit, retrieval_profile, retrieval_query, relation_release, relation_model, relation_upgrade, fact_render
     from .retrieval_model import strict_json as retrieval_json
 except ImportError:  # 兼容直接执行 validation/knowledge.py
     from adapters.uniapp_pages import read_uniapp_pages
+    from adapters.ts_java import scan as scan_candidates
+    from evidence_snapshot import snapshot as source_snapshot
     from governance import Governance, json_text, atomic_write, digest, scan_business_terms
-    import retrieval_build, retrieval_evaluate, retrieval_audit, retrieval_profile, retrieval_query
+    import retrieval_build, retrieval_evaluate, retrieval_audit, retrieval_profile, retrieval_query, relation_release, relation_model, relation_upgrade, fact_render
     from retrieval_model import strict_json as retrieval_json
 
 
@@ -869,6 +873,7 @@ def validate_project(docs: list[Document], outline: Outline, config: dict, adapt
         spec = specs[0]
         sources = document_revisions(spec, config)
         fact_count = validate_spec_facts(spec, config, cache, sources)
+        fact_render.normalized_facts(spec, sys.modules[__name__])
         api_rows, method_rows, core_ids = validate_spec_catalog(spec, outline, config, cache, sources)
         validate_semantic_quality(spec, items, facts_by_module[module_id], config, cache, sources)
         validate_intent_structure(spec, items, config)
@@ -1081,7 +1086,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--version", action="version", version=f"%(prog)s {IMPLEMENTATION_VERSION} (spec {STANDARD_VERSION})")
     subs = parser.add_subparsers(dest="action", required=True)
-    for action in ("check", "publish", "impact", "confirm-claims", "prepare", "approve", "policy-review", "audit-release", "retrieval-build", "retrieval-evaluate", "retrieval-audit", "retrieval-compare", "retrieval-query"):
+    for action in ("check", "publish", "impact", "confirm-claims", "prepare", "approve", "policy-review", "audit-release", "retrieval-build", "retrieval-evaluate", "retrieval-audit", "retrieval-compare", "retrieval-query", "relation-audit", "analyze-candidates", "evidence-snapshot", "render-facts", "preview-upgrade", "relation-report"):
         sub = subs.add_parser(action)
         sub.add_argument("--project-root", type=Path, required=True)
         if action == "publish":
@@ -1092,6 +1097,8 @@ def main() -> int:
             sub.add_argument("--retrieval-suite", type=Path)
             sub.add_argument("--retrieval-profile", choices=("full", "compact"))
         if action in {"retrieval-build", "retrieval-evaluate", "retrieval-audit"}:
+            sub.add_argument("--release-id", required=True)
+        if action == "relation-audit":
             sub.add_argument("--release-id", required=True)
         if action == "retrieval-build":
             sub.add_argument("--profile", choices=("full", "compact"))
@@ -1104,6 +1111,19 @@ def main() -> int:
             sub.add_argument("--query", required=True)
             sub.add_argument("--audience", choices=("business", "engineering"), default="business")
             sub.add_argument("--top-k", type=int, default=3)
+        if action == "analyze-candidates":
+            sub.add_argument("--repository-id", required=True)
+            sub.add_argument("--uniapp-manifest")
+        if action == "evidence-snapshot":
+            sub.add_argument("--anchor", required=True)
+        if action == "render-facts":
+            sub.add_argument("--module-id", required=True)
+        if action == "relation-report":
+            sub.add_argument("--module-id", required=True)
+        if action == "preview-upgrade":
+            sub.add_argument("--module-id", required=True)
+            sub.add_argument("--repository-id", required=True)
+            sub.add_argument("--new-commit", required=True)
         if action in {"confirm-claims", "prepare", "approve", "policy-review"}:
             sub.add_argument("--module-id", required=True)
         if action == "impact":
@@ -1130,6 +1150,33 @@ def main() -> int:
     args = parser.parse_args()
     try:
         project = args.project_root.resolve(strict=True)
+        if args.action == "evidence-snapshot":
+            _, snapshot_config = read_config(project)
+            verify_repos(snapshot_config)
+            print(json_text(source_snapshot(args.anchor, snapshot_config["repositories"])))
+            return 0
+        if args.action == "preview-upgrade":
+            preview_source, preview_config = read_config(project)
+            verify_repos(preview_config)
+            preview_docs, _ = read_documents(preview_source)
+            preview_spec = next((doc for doc in preview_docs if doc.doc_type == "spec" and doc.module_id == args.module_id), None)
+            if preview_spec is None:
+                raise KnowledgeError("升级预览模块没有结构化规格")
+            loaded = relation_model.load(preview_source, preview_spec)
+            if loaded is None:
+                raise KnowledgeError("升级预览模块没有关系映射")
+            print(json_text(relation_upgrade.preview(loaded[0], preview_config["repositories"], args.repository_id, args.new_commit)))
+            return 0
+        if args.action == "analyze-candidates":
+            _, candidate_config = read_config(project)
+            verify_repos(candidate_config)
+            repository = candidate_config["repositories"].get(args.repository_id)
+            if repository is None:
+                raise KnowledgeError("候选扫描的仓库 ID 未配置")
+            if args.uniapp_manifest and not safe_repo_path(args.uniapp_manifest):
+                raise KnowledgeError("UniApp 页面清单路径无效")
+            print(json_text(scan_candidates(args.repository_id, repository, uniapp_manifest=args.uniapp_manifest)))
+            return 0
         if args.action == "retrieval-query":
             print(json_text(retrieval_query.query_current(project, args.query, args.audience, args.top_k, sys.modules[__name__])))
             return 0
@@ -1153,7 +1200,19 @@ def main() -> int:
             governance.audit_release(None)
             print(json_text(retrieval_audit.audit_in_release(project / "发布", args.release_id)))
             return 0
+        if args.action == "relation-audit":
+            governance = Governance(project, project / "知识源", {}, [], None, sys.modules[__name__])
+            governance.audit_release(args.release_id)
+            print(json_text(relation_release.audit(project / "发布", args.release_id)))
+            return 0
         if args.action == "retrieval-build":
+            release_root = project / "发布"
+            if any(path.exists() for path in (
+                release_root / "当前关系版本.json",
+                release_root / "关系清单" / f"{args.release_id}.json",
+                release_root / "关系输入" / args.release_id,
+            )):
+                raise KnowledgeError("当前发布已绑定关系清单；检索扩展须随新发布一起生成")
             result = retrieval_build.build(project, args.release_id, args.profile, sys.modules[__name__])
             retrieval_audit.audit_in_release(project / "发布", args.release_id, require_ready=False)
             print(json_text(result))
@@ -1169,6 +1228,16 @@ def main() -> int:
         if args.action == "audit-release":
             governance = Governance(project, project / "知识源", {}, [], None, sys.modules[__name__])
             result = governance.audit_release(args.release_id)
+            release_root = project / "发布"
+            relation_pointer = release_root / "当前关系版本.json"
+            relation_artifacts = any(path.exists() for path in (
+                release_root / "关系清单" / f"{result['release_id']}.json",
+                release_root / "关系输入" / result["release_id"],
+            ))
+            if relation_pointer.exists() and retrieval_json(relation_pointer).get("release_id") == result["release_id"]:
+                relation_artifacts = True
+            if relation_artifacts:
+                result["relations"] = relation_release.audit(project / "发布", result["release_id"])
             print(json_text(result))
             return 0
         source, config = read_config(project)
@@ -1184,6 +1253,25 @@ def main() -> int:
         governance.validate_evidence(for_publish=args.action == "publish")
         governance.validate_intents(for_publish=args.action == "publish")
         governance.validate_matches(for_publish=args.action == "publish")
+        governance.validate_relations()
+        if args.action == "relation-report":
+            relation = governance.relations.get(args.module_id)
+            if not relation:
+                raise KnowledgeError("模块没有经校验的关系映射")
+            print(json_text(relation["coverage"]))
+            return 0
+        if args.action == "render-facts":
+            relation = governance.relations.get(args.module_id)
+            if not relation:
+                raise KnowledgeError("模块没有经校验的关系映射")
+            external_specs = {doc.module_id: doc for doc in docs if doc.doc_type == "spec"}
+            segments = fact_render.render_mapped(governance.spec(args.module_id), relation["data"], sys.modules[__name__], external_specs)
+            if not segments:
+                raise KnowledgeError("模块没有可生成的已证实主题事实")
+            for segment in segments:
+                scan_business_terms(sys.modules[__name__], segment["business"], segment["topic_id"])
+            print(json_text({"module_id": args.module_id, "segments": segments}))
+            return 0
         if args.action == "impact":
             print(json_text({"pending_impacts": governance.impacts(args.module_id)}))
             return 0
@@ -1244,6 +1332,8 @@ def main() -> int:
             "files": [str(doc.relative) for doc in selected],
             "warning": "锚点仅证实固定提交中存在该行；机器无法证明静态盘点穷尽、语义正确或审核人真实身份",
         }
+        if governance.relations:
+            result["relation_coverage"] = [item["coverage"] for _, item in sorted(governance.relations.items())]
         if args.action == "check":
             print(json.dumps(result, ensure_ascii=False, indent=2))
             return 0
@@ -1321,6 +1411,9 @@ def main() -> int:
                 if report["gate_status"] != "passed":
                     raise KnowledgeError("检索评测未通过；基础发布和检索扩展均未替换")
                 retrieval_audit.audit_in_release(stage_release, args.release_id)
+            if governance.relations:
+                relation_release.build(stage_release, args.release_id, governance.relations, specs)
+                relation_release.audit(stage_release, args.release_id)
             if governance.release_root.exists():
                 os.replace(governance.release_root, backup_release)
             os.replace(stage_release, governance.release_root)
@@ -1328,6 +1421,8 @@ def main() -> int:
             governance.audit_release(None)
             if args.with_retrieval:
                 result["retrieval"] = retrieval_audit.audit_in_release(governance.release_root, args.release_id)
+            if governance.relations:
+                result["relations"] = relation_release.audit(governance.release_root, args.release_id)
             result["current_release"] = pointer
             result["next_step"] = f"提交整个 发布/ 并建议创建标签 kb-{args.release_id}；提交前不要开始下一次发布"
         except Exception:

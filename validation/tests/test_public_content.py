@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import importlib.util
+import io
 import os
 from pathlib import Path
+import tempfile
 import unittest
+from contextlib import redirect_stdout
 from unittest.mock import patch
 
 
@@ -32,6 +35,19 @@ class PublicContentTests(unittest.TestCase):
         self.assertTrue(public_content.FORBIDDEN["macOS 用户绝对路径"].search(mac_path))
         self.assertTrue(public_content.FORBIDDEN["Linux 用户绝对路径"].search(linux_path))
         self.assertTrue(public_content.FORBIDDEN["Windows 用户绝对路径"].search(windows_path))
+
+    def test_new_source_fixture_formats_are_scanned(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            marker = "/" + "Users/example/private-source"
+            for suffix in (".java", ".ts", ".tsx", ".vue", ".js", ".jsx"):
+                (root / f"sample{suffix}").write_text(f"// {marker}\n", encoding="utf-8")
+            with patch.object(public_content, "ROOT", root), patch.object(
+                public_content, "LOCAL_DENYLIST", root / ".code2kb-public-denylist"
+            ), redirect_stdout(io.StringIO()) as output:
+                self.assertEqual(public_content.main(), 1)
+            for suffix in (".java", ".ts", ".tsx", ".vue", ".js", ".jsx"):
+                self.assertIn(f"sample{suffix}:1", output.getvalue())
 
 
 if __name__ == "__main__":

@@ -27,6 +27,8 @@ jobs:
         run: python -B scripts/check_spec_ids.py
       - name: Conformance fixtures
         run: python -B scripts/check_conformance.py --check-expected
+      - name: Relation contract fixtures
+        run: python -B scripts/check_relation_conformance.py
       - name: Synthetic retrieval scale
         run: python -B scripts/check_retrieval_scale.py
       - name: Markdown links
