@@ -42,7 +42,7 @@ def build(output: Path) -> Path:
     project = output / "knowledge-project"
     revision = f"source={commit}"
     config = {
-        "standard_version": "0.8.3",
+        "standard_version": "c2kb-file/1",
         "knowledge_source_root": "知识源",
         "coverage_terms": ["后端入口"],
         "sensitive_patterns": [],

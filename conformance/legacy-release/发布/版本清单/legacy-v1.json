@@ -1,0 +1,53 @@
+{
+  "standard_version": "0.8.3",
+  "registry_schema_version": "2.0",
+  "release_id": "legacy-v1",
+  "document_commit": "040292ece38615420a73b3f4aa4e0a6ff8561f00",
+  "generated_by": {
+    "name": "Code2KB Spec",
+    "version": "0.6.0"
+  },
+  "created_at": "2026-10-25T07:09:57.101165+00:00",
+  "review_summary": {
+    "human": 1,
+    "policy_auto": 0
+  },
+  "module_reviews": {
+    "example.order.query": {
+      "mode": "human",
+      "reviewed_by": "example-reviewer"
+    }
+  },
+  "views": {
+    "business": {
+      "path": "发布/业务版",
+      "files": {
+        "功能大纲.md": "d4c77f51e54bb325ff1f237fd8308f0d0ddb266a1b57d6646c165dbf65b78750",
+        "发布信息.md": "aef5e82194e2386702f0dae8dedd82350bb46cbd54c892939d18cbc59a921dbd",
+        "检索索引.md": "84b387097d1b0ba7ba11007cbb6b07a98d0f79875c937c2eaacdf9aab41bdbe8",
+        "目录.md": "db2f4c747e1ae5d3a031145d820a9ca7924833bf34317be554bb04784438717a",
+        "订单/目录.md": "3ed4c4ac40cdf0001e21f35471a3bfa1bc1d3a425a968f46d797003bce52e0bf",
+        "订单/订单查询/功能与范围.md": "4aeb4b9339d81c2d58b11f7944ae61870c8e97ca672392849a65db2e2b32498c",
+        "订单/订单查询/模块概览.md": "894b8e674f6b703dcd30d2090e527e6b6514519ed2c0c92f80e524a3b94fbe99",
+        "订单/订单查询/目录.md": "af3dfca584ba21452bd6f525617a67c3ec32ae93db224061d782b1f1b4989af9"
+      }
+    },
+    "engineering": {
+      "path": "发布/研发版",
+      "files": {
+        "功能大纲.md": "d4c77f51e54bb325ff1f237fd8308f0d0ddb266a1b57d6646c165dbf65b78750",
+        "发布信息.md": "761be7ea2867fe8571453fd4ace6bd170bdcd04b45e147d7365035fa6ce8dc7d",
+        "检索索引.md": "e6ded807dedd221a5fc82f4d34a5baa33583028fdd8fbd1e587e90bedf4691d1",
+        "目录.md": "db2f4c747e1ae5d3a031145d820a9ca7924833bf34317be554bb04784438717a",
+        "订单/目录.md": "3ed4c4ac40cdf0001e21f35471a3bfa1bc1d3a425a968f46d797003bce52e0bf",
+        "订单/订单查询/事实编号对照.md": "d8f4b90e8bfcc145bbfcb046307d359a9f0add26761cff0cd7a662e7ebed9d03",
+        "订单/订单查询/功能与范围.md": "4aeb4b9339d81c2d58b11f7944ae61870c8e97ca672392849a65db2e2b32498c",
+        "订单/订单查询/技术实现.md": "ee786e7f330aae4d13791c33019c696879f874e9149478f77ff1a3d2f497c376",
+        "订单/订单查询/接口与调用.md": "20e5f61635d8878e99e314a69e6ae0c28346cb2c102b6a287345fc8839068e63",
+        "订单/订单查询/方法与源码.md": "8778007813a616f0f0a14c1be5c795977df067184881a1df96dfc680e33f30ba",
+        "订单/订单查询/模块概览.md": "894b8e674f6b703dcd30d2090e527e6b6514519ed2c0c92f80e524a3b94fbe99",
+        "订单/订单查询/目录.md": "a7e48eb1066a6eff3d5e408decad63fd013cc27d47e263392d61db41378ccc18"
+      }
+    }
+  }
+}

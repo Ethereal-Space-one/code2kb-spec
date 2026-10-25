@@ -1,5 +1,5 @@
 {
-  "standard_version": "0.8.3",
+  "standard_version": "c2kb-file/1",
   "knowledge_source_root": "知识源",
   "coverage_terms": ["入口", "调用", "未覆盖"],
   "sensitive_patterns": [],

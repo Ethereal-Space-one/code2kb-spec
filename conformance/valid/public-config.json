@@ -1,0 +1,11 @@
+{
+  "standard_version": "c2kb-file/1",
+  "knowledge_source_root": "知识源",
+  "coverage_terms": [],
+  "repositories": {
+    "source_a": {
+      "path": "${CODE2KB_FIXTURE_SOURCE}",
+      "commit": "0123456789abcdef"
+    }
+  }
+}

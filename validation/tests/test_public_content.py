@@ -40,13 +40,14 @@ class PublicContentTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             marker = "/" + "Users/example/private-source"
-            for suffix in (".java", ".ts", ".tsx", ".vue", ".js", ".jsx"):
+            suffixes = (".java", ".ts", ".tsx", ".vue", ".js", ".jsx", ".php", ".go", ".rs", ".sh", ".sql", ".html", ".css")
+            for suffix in suffixes:
                 (root / f"sample{suffix}").write_text(f"// {marker}\n", encoding="utf-8")
             with patch.object(public_content, "ROOT", root), patch.object(
                 public_content, "LOCAL_DENYLIST", root / ".code2kb-public-denylist"
             ), redirect_stdout(io.StringIO()) as output:
                 self.assertEqual(public_content.main(), 1)
-            for suffix in (".java", ".ts", ".tsx", ".vue", ".js", ".jsx"):
+            for suffix in suffixes:
                 self.assertIn(f"sample{suffix}:1", output.getvalue())
 
 

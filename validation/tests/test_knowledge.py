@@ -341,7 +341,7 @@ class KnowledgeTests(unittest.TestCase):
         result = self.run_cli("check")
         self.assertEqual(result.returncode, 0, result.stderr)
         report = json.loads(result.stdout)
-        self.assertEqual(report["standard_version"], "0.8.3")
+        self.assertEqual(report["standard_version"], core.STANDARD_VERSION)
         self.assertEqual((report["intent_claims"], report["intent_published"], report["intent_internal"]), (2, 1, 1))
 
     def test_rejects_non_current_standard_version(self) -> None:
@@ -352,6 +352,23 @@ class KnowledgeTests(unittest.TestCase):
         result = self.run_cli("check")
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("standard_version 必须为", result.stderr)
+
+    def test_candidate_schema_keeps_old_payload_and_json_envelope(self) -> None:
+        command = ("--repository-id", "frontend", "--uniapp-manifest", "src/pages.json")
+        old = self.run_cli("analyze-candidates", *command)
+        self.assertEqual(old.returncode, 0, old.stderr)
+        old_payload = json.loads(old.stdout)
+        self.assertEqual(old_payload["schema_version"], "0.1")
+        wrapped = self.run_cli("analyze-candidates", *command, "--output", "json")
+        self.assertEqual(wrapped.returncode, 0, wrapped.stderr)
+        envelope = json.loads(wrapped.stdout)
+        self.assertEqual(envelope["response_schema_version"], "0.1")
+        self.assertEqual(envelope["result"], old_payload)
+        new = self.run_cli("analyze-candidates", *command, "--candidate-schema", "0.2")
+        self.assertEqual(new.returncode, 0, new.stderr)
+        new_payload = json.loads(new.stdout)
+        self.assertEqual(new_payload["schema_version"], "0.2")
+        self.assertTrue(any(item["kind"] == "uniapp_route" and item["capability"] == "L2" for item in new_payload["candidates"]))
 
     def test_unconfirmed_intent_cannot_be_projected_to_robot_knowledge(self) -> None:
         self.enable_business_intent()
@@ -378,7 +395,7 @@ class KnowledgeTests(unittest.TestCase):
         for view in ("业务版", "研发版"):
             self.assertTrue((self.project / f"发布/{view}/订单/订单查询/业务意图.md").is_file())
         registry = json.loads((self.project / "发布/版本清单/intent-v1.json").read_text(encoding="utf-8"))
-        self.assertEqual((registry["standard_version"], registry["registry_schema_version"]), ("0.8.3", "2.0"))
+        self.assertEqual((registry["standard_version"], registry["registry_schema_version"]), (core.STANDARD_VERSION, "2.0"))
 
     def test_internal_only_intent_does_not_create_robot_document(self) -> None:
         config_path = self.project / "知识库配置.json"

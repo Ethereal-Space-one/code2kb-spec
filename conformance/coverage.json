@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0",
-  "spec_version": "0.8.3",
+  "spec_version": "c2kb-file/1",
   "requirements": {
     "C2KB-BASE-001": [
       "examples/create_demo.py"

@@ -1,0 +1,14 @@
+{
+  "standard_version": "0.8.3",
+  "release_id": "legacy-v1",
+  "business_path": "发布/业务版",
+  "engineering_path": "发布/研发版",
+  "document_commit": "040292ece38615420a73b3f4aa4e0a6ff8561f00",
+  "registry_path": "发布/版本清单/legacy-v1.json",
+  "registry_sha256": "0ad784a802257cffe690544de26be6cf2c5731ad4ee8cc41ecd7f114d184ece1",
+  "history_backend": "git",
+  "generated_by": {
+    "name": "Code2KB Spec",
+    "version": "0.6.0"
+  }
+}

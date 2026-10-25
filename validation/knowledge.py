@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate Code2KB 0.8.3 projects and publish governed knowledge views."""
+"""Validate supported Code2KB projects and publish governed knowledge views."""
 
 from __future__ import annotations
 
@@ -20,18 +20,18 @@ import tempfile
 from urllib.parse import unquote
 
 try:
-    from .adapters.uniapp_pages import read_uniapp_pages
     from .adapters.ts_java import scan as scan_candidates
+    from .adapters import ADAPTER_NAMES, get_adapter
     from .evidence_snapshot import snapshot as source_snapshot
     from .governance import Governance, json_text, atomic_write, digest, scan_business_terms
-    from . import retrieval_build, retrieval_evaluate, retrieval_audit, retrieval_profile, retrieval_query, relation_release, relation_model, relation_upgrade, fact_render, run_state, workflow, host_adapter
+    from . import retrieval_build, retrieval_evaluate, retrieval_audit, retrieval_profile, retrieval_query, relation_release, relation_model, relation_upgrade, fact_render, run_state, workflow, host_adapter, protocol, protocol_migration
     from .retrieval_model import strict_json as retrieval_json
 except ImportError:  # 兼容直接执行 validation/knowledge.py
-    from adapters.uniapp_pages import read_uniapp_pages
     from adapters.ts_java import scan as scan_candidates
+    from adapters import ADAPTER_NAMES, get_adapter
     from evidence_snapshot import snapshot as source_snapshot
     from governance import Governance, json_text, atomic_write, digest, scan_business_terms
-    import retrieval_build, retrieval_evaluate, retrieval_audit, retrieval_profile, retrieval_query, relation_release, relation_model, relation_upgrade, fact_render, run_state, workflow, host_adapter
+    import retrieval_build, retrieval_evaluate, retrieval_audit, retrieval_profile, retrieval_query, relation_release, relation_model, relation_upgrade, fact_render, run_state, workflow, host_adapter, protocol, protocol_migration
     from retrieval_model import strict_json as retrieval_json
 
 
@@ -42,14 +42,15 @@ else:
     from importlib.metadata import version
 
     IMPLEMENTATION_VERSION = version("code2kb-spec")
-STANDARD_VERSION = "0.8.3"
-SUPPORTED_STANDARD_VERSIONS = {STANDARD_VERSION}
+STANDARD_VERSION = protocol.DEFAULT_VERSION
+LEGACY_STANDARD_VERSION = protocol.LEGACY_VERSION
+SUPPORTED_STANDARD_VERSIONS = protocol.SUPPORTED_VERSIONS
 ACTIONS = (
     "check", "publish", "impact", "confirm-claims", "prepare", "approve", "policy-review", "audit-release",
     "retrieval-build", "retrieval-evaluate", "retrieval-audit", "retrieval-compare", "retrieval-query",
     "relation-audit", "analyze-candidates", "evidence-snapshot", "render-facts", "preview-upgrade",
     "relation-report", "recover", "run-create", "run-status", "run-next", "run-begin", "run-complete",
-    "run-resume", "run-cancel", "run-execute", "host-next",
+    "run-resume", "run-cancel", "run-execute", "host-next", "migrate-protocol",
 )
 TYPES = {
     "模块概览.md": "overview",
@@ -232,10 +233,10 @@ def read_config(project: Path, *, resolve_repository_paths: bool = True, environ
         config["_content_profile"] = profile["content_profile"]
     else:
         config["_content_profile"] = "full"
-    if config.get("standard_version") not in SUPPORTED_STANDARD_VERSIONS:
-        raise KnowledgeError(f"{config_path}: standard_version 必须为 {STANDARD_VERSION}")
+    if not isinstance(config.get("standard_version"), str) or config["standard_version"] not in SUPPORTED_STANDARD_VERSIONS:
+        raise KnowledgeError(f"{config_path}: standard_version 必须为受支持的协议标识：{', '.join(sorted(SUPPORTED_STANDARD_VERSIONS))}")
     if "publish_boundary" in config:
-        raise KnowledgeError("知识规范 0.8.3 使用 boundary_notes；发布范围数字由大纲自动生成")
+        raise KnowledgeError("兼容文件协议使用 boundary_notes；发布范围数字由大纲自动生成")
     notes = config.get("boundary_notes", {})
     if not isinstance(notes, dict) or any(key not in {"business", "engineering"} or not isinstance(value, str) for key, value in notes.items()):
         raise KnowledgeError("boundary_notes 须为 business/engineering 字符串")
@@ -496,7 +497,7 @@ def registered_adapter_entries(config: dict) -> set[str] | None:
     if adapter is None:
         return None
     if adapter["name"] == "uniapp_pages":
-        return read_uniapp_pages(config["repositories"][adapter["repository"]], adapter["manifest_path"])
+        return get_adapter("builtin-mixed").inventory_entries(config["repositories"][adapter["repository"]], adapter["manifest_path"])
     raise KnowledgeError(f"未知入口盘点适配器：{adapter['name']}")
 
 
@@ -773,9 +774,9 @@ def validate_intent_structure(spec: Document, items: list[Document], config: dic
     """Validate publication projection; evidence semantics are checked by Governance."""
     rows = intent_rows(spec)
     intents = [doc for doc in items if doc.doc_type == "intent"]
-    if config["standard_version"] != STANDARD_VERSION:
+    if not protocol.supports(config["standard_version"], "business_intent"):
         if intents or rows:
-            raise KnowledgeError(f"{spec.relative}: 业务意图只能用于 standard_version {STANDARD_VERSION}")
+            raise KnowledgeError(f"{spec.relative}: 当前 standard_version 不支持业务意图")
         return {"claims": 0, "published": 0, "internal": 0}
     if len(intents) > 1:
         raise KnowledgeError(f"{spec.relative}: 模块只允许一份业务意图.md")
@@ -1097,7 +1098,7 @@ def validate_bundle(root: Path, engineering: bool) -> None:
 
 def _main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--version", action="version", version=f"%(prog)s {IMPLEMENTATION_VERSION} (spec {STANDARD_VERSION})")
+    parser.add_argument("--version", action="version", version=f"%(prog)s {IMPLEMENTATION_VERSION} (default file protocol {STANDARD_VERSION}; legacy {LEGACY_STANDARD_VERSION})")
     subs = parser.add_subparsers(dest="action", required=True)
     for action in ACTIONS:
         sub = subs.add_parser(action)
@@ -1122,8 +1123,8 @@ def _main() -> int:
             sub.add_argument("--actor", default="")
             sub.add_argument("--note", default="")
         if action == "publish":
-            sub.add_argument("--business-out", type=Path, help="兼容参数；0.8.3 只接受固定路径 发布/业务版")
-            sub.add_argument("--engineering-out", type=Path, help="兼容参数；0.8.3 只接受固定路径 发布/研发版")
+            sub.add_argument("--business-out", type=Path, help="兼容参数；只接受固定路径 发布/业务版")
+            sub.add_argument("--engineering-out", type=Path, help="兼容参数；只接受固定路径 发布/研发版")
             sub.add_argument("--release-id", required=True)
             sub.add_argument("--with-retrieval", action="store_true")
             sub.add_argument("--retrieval-suite", type=Path)
@@ -1146,6 +1147,15 @@ def _main() -> int:
         if action == "analyze-candidates":
             sub.add_argument("--repository-id", required=True)
             sub.add_argument("--uniapp-manifest")
+            sub.add_argument("--candidate-schema", choices=("0.1", "0.2"), default="0.1")
+            sub.add_argument("--scope", help="0.2 格式可用的仓库内相对扫描路径")
+            sub.add_argument("--adapter", choices=ADAPTER_NAMES, default="builtin-mixed", help="0.2 格式的内置 Adapter")
+        if action == "migrate-protocol":
+            sub.add_argument("--to", choices=(protocol.DEFAULT_VERSION,), required=True)
+            mode = sub.add_mutually_exclusive_group(required=True)
+            mode.add_argument("--dry-run", action="store_true")
+            mode.add_argument("--apply", action="store_true")
+            sub.add_argument("--plan-sha256", help="正式执行时填写预演返回的摘要")
         if action == "evidence-snapshot":
             sub.add_argument("--anchor", required=True)
         if action == "render-facts":
@@ -1184,6 +1194,13 @@ def _main() -> int:
     locked = False
     try:
         project = args.project_root.resolve(strict=True)
+        if args.action == "migrate-protocol":
+            if args.apply and not args.plan_sha256 or args.dry_run and args.plan_sha256:
+                raise KnowledgeError("预演不接收 --plan-sha256；执行必须提供预演摘要")
+            result = protocol_migration.apply(project, args.plan_sha256) if args.apply else protocol_migration.preview(project)
+            result.pop("after", None)
+            print(json_text(result))
+            return 0
         if args.action in {"confirm-claims", "prepare", "approve", "policy-review", "publish", "retrieval-build", "retrieval-evaluate", "recover", "run-create", "run-begin", "run-complete", "run-resume", "run-cancel"}:
             lock = run_state.project_lock(project)
             lock.__enter__()
@@ -1266,7 +1283,13 @@ def _main() -> int:
                 raise KnowledgeError("候选扫描的仓库 ID 未配置")
             if args.uniapp_manifest and not safe_repo_path(args.uniapp_manifest):
                 raise KnowledgeError("UniApp 页面清单路径无效")
-            print(json_text(scan_candidates(args.repository_id, repository, uniapp_manifest=args.uniapp_manifest)))
+            if args.scope and (args.candidate_schema != "0.2" or not safe_repo_path(args.scope)):
+                raise KnowledgeError("--scope 只用于 0.2 格式且须是安全的仓库相对路径")
+            if args.candidate_schema == "0.1" and args.adapter != "builtin-mixed":
+                raise KnowledgeError("--adapter 只用于候选格式 0.2")
+            result = (get_adapter(args.adapter).scan(args.repository_id, repository, scope=args.scope, uniapp_manifest=args.uniapp_manifest)
+                      if args.candidate_schema == "0.2" else scan_candidates(args.repository_id, repository, uniapp_manifest=args.uniapp_manifest))
+            print(json_text(result))
             return 0
         if args.action == "retrieval-query":
             print(json_text(retrieval_query.query_current(project, args.query, args.audience, args.top_k, sys.modules[__name__])))
@@ -1457,7 +1480,7 @@ def _main() -> int:
         business_out = supplied_business.resolve(strict=False)
         engineering_out = supplied_engineering.resolve(strict=False)
         if business_out != expected_business.resolve(strict=False) or engineering_out != expected_engineering.resolve(strict=False):
-            raise KnowledgeError("知识规范 0.8.3 使用固定发布路径：发布/业务版 与 发布/研发版；历史版本由 Git 管理")
+            raise KnowledgeError("兼容文件协议使用固定发布路径：发布/业务版 与 发布/研发版；历史版本由 Git 管理")
         if any(path_is_nested(a, b) for a, b in ((business_out, engineering_out), (business_out, source), (engineering_out, source))):
             raise KnowledgeError("两个输出目录与知识源目录必须彼此不相交")
         for role, settings in config["repositories"].items():
