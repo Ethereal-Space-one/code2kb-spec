@@ -70,6 +70,8 @@ def main() -> int:
         failures.append("新项目配置模板的协议标识与校验器不一致")
     if report.get("spec_version") != protocol:
         failures.append("一致性报告的协议标识与新项目默认值不一致")
+    if report.get("implementation_version") != version:
+        failures.append("一致性报告的工程版本与 VERSION 不一致")
     if f"新知识项目的 `standard_version` 必须为 `{protocol}`" not in read("spec/00-规范说明.md"):
         failures.append("基础规范的协议标识与校验器不一致")
 
