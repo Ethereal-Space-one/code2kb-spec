@@ -5,6 +5,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from validation.adapters.ts_java import scan
 from validation.adapters.platform import scan as scan_platform
@@ -35,6 +36,10 @@ class CandidateAdapterTests(unittest.TestCase):
             scoped = scan_platform("source", settings, scope="tool.sh")
             self.assertEqual({item["source_path"] for item in scoped["candidates"]}, {"tool.sh"})
             self.assertEqual(scoped["edges"], [])
+            with patch("validation.adapters.platform.MAX_FILES", 1), patch("validation.adapters.ts_java.MAX_FILES", 1):
+                self.assertEqual({item["source_path"] for item in scan_platform("source", settings, scope="tool.sh")["candidates"]}, {"tool.sh"})
+            with self.assertRaisesRegex(ValueError, "扫描范围"):
+                scan_platform("source", settings, scope="../tool.sh")
             fallback = scan_platform("source", settings, adapter_name="universal-l1")
             self.assertEqual(fallback["adapter"]["name"], "universal-l1")
             self.assertEqual({item["kind"] for item in fallback["candidates"]}, {"source_file"})
@@ -43,6 +48,10 @@ class CandidateAdapterTests(unittest.TestCase):
             invalid["candidates"][0]["status"] = "verified"
             with self.assertRaisesRegex(ValueError, "状态无效"):
                 validate_result(invalid)
+            invalid_edge = dict(first)
+            invalid_edge["edges"] = [dict(first["edges"][0], evidence=["wrong:anchor:1", first["edges"][0]["evidence"][1]])]
+            with self.assertRaisesRegex(ValueError, "桥接关系"):
+                validate_result(invalid_edge)
 
     def test_fixed_commit_candidates_and_unresolved_paths(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

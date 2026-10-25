@@ -87,6 +87,10 @@ class ProtocolMigrationTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("尚未完成", result.stderr)
         self.assertEqual(before, (self.project / "知识库配置.json").read_bytes())
+        fixture.write(run, json.dumps({"status": "active", "tasks": []}))
+        empty = self.run_cli("migrate-protocol", "--to", core.STANDARD_VERSION, "--dry-run")
+        self.assertNotEqual(empty.returncode, 0)
+        self.assertIn("尚未完成", empty.stderr)
 
     def test_legacy_business_intent_gate_stays_enabled(self) -> None:
         self.enable_business_intent()

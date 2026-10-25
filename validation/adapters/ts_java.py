@@ -38,10 +38,22 @@ def candidate(role: str, path: str, line: int, kind: str, expression: str, statu
     }
 
 
-def scan(repository_id: str, repository: dict, *, uniapp_manifest: str | None = None) -> dict:
+def scan(repository_id: str, repository: dict, *, uniapp_manifest: str | None = None,
+         scope: str | None = None) -> dict:
     repo, revision = repository["path"], repository["commit"]
     commit = git(repo, "rev-parse", "--verify", f"{revision}^{{commit}}").decode("ascii").strip()
     entries = [value for value in git(repo, "ls-tree", "-r", "-z", commit).split(b"\0") if value]
+    if scope:
+        selected = []
+        for entry in entries:
+            try:
+                _, encoded_path = entry.split(b"\t", 1)
+                path = encoded_path.decode("utf-8")
+            except (ValueError, UnicodeError) as exc:
+                raise CandidateError("Git 文件目录包含无效记录") from exc
+            if path == scope or path.startswith(scope.rstrip("/") + "/"):
+                selected.append(entry)
+        entries = selected
     if len(entries) > MAX_FILES:
         raise CandidateError("固定提交文件数量超过候选扫描上限")
     results = []

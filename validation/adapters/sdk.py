@@ -30,6 +30,7 @@ def validate_result(result: dict) -> dict:
     if not isinstance(candidates, list) or not isinstance(edges, list):
         raise ValueError("Adapter 候选或关系列表无效")
     ids = set()
+    anchors = {}
     for item in candidates:
         if not isinstance(item, dict) or not {"candidate_id", "repository_id", "source_path", "line", "kind", "language", "expression", "status", "capability", "rule_id", "rule_version", "anchor", "unresolved_reason"} <= set(item):
             raise ValueError("Adapter 候选字段不完整")
@@ -40,9 +41,10 @@ def validate_result(result: dict) -> dict:
         if item["status"] == "unresolved" and not item["unresolved_reason"]:
             raise ValueError("未解候选缺少原因")
         ids.add(item["candidate_id"])
+        anchors[item["candidate_id"]] = item["anchor"]
     edge_ids = set()
     for edge in edges:
-        if not isinstance(edge, dict) or set(edge) != {"edge_id", "from_candidate_id", "to_candidate_id", "status", "basis", "evidence"} or edge["edge_id"] in edge_ids or edge["from_candidate_id"] not in ids or edge["to_candidate_id"] not in ids or edge["status"] not in {"candidate", "unresolved"} or not isinstance(edge["evidence"], list) or len(edge["evidence"]) != 2:
+        if not isinstance(edge, dict) or set(edge) != {"edge_id", "from_candidate_id", "to_candidate_id", "status", "basis", "evidence", "unresolved_reason"} or edge["edge_id"] in edge_ids or edge["from_candidate_id"] not in ids or edge["to_candidate_id"] not in ids or edge["status"] not in {"candidate", "unresolved"} or edge["evidence"] != [anchors[edge["from_candidate_id"]], anchors[edge["to_candidate_id"]]] or (edge["status"] == "unresolved" and not edge["unresolved_reason"]):
             raise ValueError("Adapter 桥接关系缺少两端、证据或有效状态")
         edge_ids.add(edge["edge_id"])
     if result["unresolved"] != sum(item["status"] == "unresolved" for item in candidates):

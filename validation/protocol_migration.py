@@ -74,7 +74,7 @@ def _execution_state(project: Path) -> None:
                 raise ValueError("运行账本无法解析") from exc
             if not isinstance(record, dict) or record.get("status") not in {"active", "cancelled"} or not isinstance(record.get("tasks"), list):
                 raise ValueError("运行账本结构无效")
-            if record["status"] == "active" and not all(isinstance(task, dict) and task.get("status") == "completed" for task in record["tasks"]):
+            if record["status"] == "active" and (not record["tasks"] or not all(isinstance(task, dict) and task.get("status") == "completed" for task in record["tasks"])):
                 raise ValueError(f"运行 {path.name} 尚未完成；先完成或取消，再创建新运行")
 
 

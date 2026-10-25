@@ -4,7 +4,7 @@
 
 Code2KB Spec extracts evidence-backed business behavior and code logic from fixed source revisions into traceable, reviewable, publishable, and retrievable knowledge bases. The repository also provides a Python reference implementation, an AI agent skill, templates, and stack adapters. Source code alone cannot prove business-policy intent or live behavior; uncertainty remains part of the knowledge.
 
-> Current project version: `0.6.0`. The knowledge file protocol has its own compatibility identifier; it does not follow the version of any project using this tool.
+> Current project version: `0.7.0`. The knowledge file protocol has its own compatibility identifier; it does not follow the version of any project using this tool.
 
 ## Three layers
 
@@ -55,6 +55,10 @@ The optional [relation and evidence extension](docs/relation-contract.md) adds f
 ## What's new in 0.6.0
 
 The optional [local resumable runner](docs/0.6.0-runner.md) adds a durable task ledger, project locking, crash recovery, batch checkpoints, and thin Claude Code and Codex adapters. The ledger does not grant approval. Existing projects need not enable it or republish for this change. See [versioning](docs/versioning.md) for file-format compatibility and the [implementation plan](docs/0.6.0-implementation-plan.md) for scope.
+
+## What's new in 0.7.0
+
+New projects default to the independent `c2kb-file/1` file protocol identifier. Existing `0.8.3` projects retain their validation, publishing, and audit path; migration requires an explicit preview and apply step. Multilanguage adapters emit fixed-revision candidates, capability declarations, and conservative relationship clues. Candidates still need human evidence review before becoming knowledge facts. An independent [Spring PetClinic public sample](docs/0.7.0-public-sample-review.md) exercises manually anchored facts through both published views and retrieval units; it does not establish automatic cross-repository pairing or live behavior. See the [implementation and review record](docs/0.7.0-implementation-report.md).
 
 ## Boundaries
 

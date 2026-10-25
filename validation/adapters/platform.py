@@ -42,10 +42,9 @@ def identity(*parts: object) -> str:
 
 def _files(repo: str, commit: str, scope: str | None) -> tuple[list[tuple[str, int]], Counter]:
     entries = [entry for entry in fixed_git(repo, "ls-tree", "-r", "-l", "-z", commit).split(b"\0") if entry]
-    if len(entries) > MAX_FILES:
-        raise ValueError("固定提交文件数量超过 Adapter 扫描上限")
     selected: list[tuple[str, int]] = []
     skipped = Counter()
+    in_scope = 0
     for entry in entries:
         try:
             descriptor, encoded = entry.split(b"\t", 1)
@@ -55,6 +54,9 @@ def _files(repo: str, commit: str, scope: str | None) -> tuple[list[tuple[str, i
             raise ValueError("固定提交目录包含无效记录") from exc
         if scope and path != scope and not path.startswith(scope.rstrip("/") + "/"):
             continue
+        in_scope += 1
+        if in_scope > MAX_FILES:
+            raise ValueError("所选范围文件数量超过 Adapter 扫描上限")
         if mode not in {"100644", "100755"} or kind != "blob":
             skipped["non_regular"] += 1
             continue
@@ -74,6 +76,8 @@ def scan(repository_id: str, repository: dict, *, scope: str | None = None, unia
         raise ValueError(f"未知内置 Adapter：{adapter_name}")
     if adapter_name == "universal-l1" and uniapp_manifest:
         raise ValueError("universal-l1 不解析 UniApp 页面清单")
+    if scope is not None and (not scope or scope.startswith("/") or "\\" in scope or any(part in {"", ".", ".."} for part in scope.split("/"))):
+        raise ValueError("扫描范围必须是安全的仓库相对路径")
     repo, revision = repository["path"], repository["commit"]
     commit = fixed_git(repo, "rev-parse", "--verify", f"{revision}^{{commit}}").decode("ascii").strip()
     selected, skipped = _files(repo, commit, scope)
@@ -98,7 +102,7 @@ def scan(repository_id: str, repository: dict, *, scope: str | None = None, unia
             "rule_id": "text-file-inventory", "rule_version": ADAPTER_VERSION,
             "anchor": f"{repository_id}:{path}:1", "unresolved_reason": None,
         })
-    old = legacy_scan(repository_id, repository, uniapp_manifest=uniapp_manifest) if adapter_name == "builtin-mixed" else {"candidates": []}
+    old = legacy_scan(repository_id, repository, uniapp_manifest=uniapp_manifest, scope=scope) if adapter_name == "builtin-mixed" else {"candidates": []}
     occurrences = Counter()
     for item in old["candidates"]:
         path = item["source_path"]
@@ -128,7 +132,7 @@ def scan(repository_id: str, repository: dict, *, scope: str | None = None, unia
             edges.append({"edge_id": identity(left["candidate_id"], right["candidate_id"]),
                           "from_candidate_id": left["candidate_id"], "to_candidate_id": right["candidate_id"],
                           "status": "candidate", "basis": "equal_literal_path_only",
-                          "evidence": [left["anchor"], right["anchor"]]})
+                          "evidence": [left["anchor"], right["anchor"]], "unresolved_reason": None})
     candidates.sort(key=lambda item: (item["source_path"], item["line"], item["kind"], item["expression"]))
     edges.sort(key=lambda item: item["edge_id"])
     return validate_result({
