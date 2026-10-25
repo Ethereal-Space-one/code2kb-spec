@@ -4,9 +4,12 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
+from contextvars import ContextVar
 from dataclasses import dataclass, replace
 from datetime import date, datetime, timezone
 import json
+import io
 import os
 from pathlib import Path, PurePosixPath
 import re
@@ -21,14 +24,14 @@ try:
     from .adapters.ts_java import scan as scan_candidates
     from .evidence_snapshot import snapshot as source_snapshot
     from .governance import Governance, json_text, atomic_write, digest, scan_business_terms
-    from . import retrieval_build, retrieval_evaluate, retrieval_audit, retrieval_profile, retrieval_query, relation_release, relation_model, relation_upgrade, fact_render
+    from . import retrieval_build, retrieval_evaluate, retrieval_audit, retrieval_profile, retrieval_query, relation_release, relation_model, relation_upgrade, fact_render, run_state, workflow, host_adapter
     from .retrieval_model import strict_json as retrieval_json
 except ImportError:  # 兼容直接执行 validation/knowledge.py
     from adapters.uniapp_pages import read_uniapp_pages
     from adapters.ts_java import scan as scan_candidates
     from evidence_snapshot import snapshot as source_snapshot
     from governance import Governance, json_text, atomic_write, digest, scan_business_terms
-    import retrieval_build, retrieval_evaluate, retrieval_audit, retrieval_profile, retrieval_query, relation_release, relation_model, relation_upgrade, fact_render
+    import retrieval_build, retrieval_evaluate, retrieval_audit, retrieval_profile, retrieval_query, relation_release, relation_model, relation_upgrade, fact_render, run_state, workflow, host_adapter
     from retrieval_model import strict_json as retrieval_json
 
 
@@ -41,6 +44,13 @@ else:
     IMPLEMENTATION_VERSION = version("code2kb-spec")
 STANDARD_VERSION = "0.8.3"
 SUPPORTED_STANDARD_VERSIONS = {STANDARD_VERSION}
+ACTIONS = (
+    "check", "publish", "impact", "confirm-claims", "prepare", "approve", "policy-review", "audit-release",
+    "retrieval-build", "retrieval-evaluate", "retrieval-audit", "retrieval-compare", "retrieval-query",
+    "relation-audit", "analyze-candidates", "evidence-snapshot", "render-facts", "preview-upgrade",
+    "relation-report", "recover", "run-create", "run-status", "run-next", "run-begin", "run-complete",
+    "run-resume", "run-cancel", "run-execute", "host-next",
+)
 TYPES = {
     "模块概览.md": "overview",
     "功能与范围.md": "scope",
@@ -105,6 +115,9 @@ BUSINESS_FORBIDDEN = re.compile(
 
 class KnowledgeError(Exception):
     pass
+
+
+_last_error_code: ContextVar[str | None] = ContextVar("code2kb_last_error_code", default=None)
 
 
 @dataclass(frozen=True)
@@ -1082,13 +1095,32 @@ def validate_bundle(root: Path, engineering: bool) -> None:
                 raise KnowledgeError(f"发布物事实编号无定义：{path.relative_to(root)} → {match.group(0)}")
 
 
-def main() -> int:
+def _main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--version", action="version", version=f"%(prog)s {IMPLEMENTATION_VERSION} (spec {STANDARD_VERSION})")
     subs = parser.add_subparsers(dest="action", required=True)
-    for action in ("check", "publish", "impact", "confirm-claims", "prepare", "approve", "policy-review", "audit-release", "retrieval-build", "retrieval-evaluate", "retrieval-audit", "retrieval-compare", "retrieval-query", "relation-audit", "analyze-candidates", "evidence-snapshot", "render-facts", "preview-upgrade", "relation-report"):
+    for action in ACTIONS:
         sub = subs.add_parser(action)
         sub.add_argument("--project-root", type=Path, required=True)
+        sub.add_argument("--output", choices=("text", "json"), default="text", help="可选机器响应；默认保持既有输出")
+        if action.startswith("run-"):
+            sub.add_argument("--run-id", required=True)
+        if action == "host-next":
+            sub.add_argument("--run-id", required=True)
+            sub.add_argument("--host", choices=tuple(sorted(host_adapter.HOSTS)), required=True)
+        if action == "run-create":
+            selection = sub.add_mutually_exclusive_group(required=True)
+            selection.add_argument("--module-id", action="append", help="可重复指定功能大纲中的模块")
+            selection.add_argument("--all-modules", action="store_true", help="按功能大纲顺序纳入全部模块")
+            sub.add_argument("--release-id", required=True)
+            sub.add_argument("--batch-size", type=int, default=5)
+            sub.add_argument("--business-intent", action="store_true", help="按需增加业务意图证据任务")
+            sub.add_argument("--retrieval-suite", type=Path, help="显式启用发布时检索评测")
+        if action in {"run-begin", "run-complete", "run-execute"}:
+            sub.add_argument("--task-id", required=True)
+        if action == "run-complete":
+            sub.add_argument("--actor", default="")
+            sub.add_argument("--note", default="")
         if action == "publish":
             sub.add_argument("--business-out", type=Path, help="兼容参数；0.8.3 只接受固定路径 发布/业务版")
             sub.add_argument("--engineering-out", type=Path, help="兼容参数；0.8.3 只接受固定路径 发布/研发版")
@@ -1148,8 +1180,67 @@ def main() -> int:
         if action == "audit-release":
             sub.add_argument("--release-id")
     args = parser.parse_args()
+    lock = None
+    locked = False
     try:
         project = args.project_root.resolve(strict=True)
+        if args.action in {"confirm-claims", "prepare", "approve", "policy-review", "publish", "retrieval-build", "retrieval-evaluate", "recover", "run-create", "run-begin", "run-complete", "run-resume", "run-cancel"}:
+            lock = run_state.project_lock(project)
+            lock.__enter__()
+            locked = True
+            if args.action != "recover":
+                run_state.require_recovered(project)
+        if args.action == "recover":
+            def audit_recovered_release(release_id):
+                governance = Governance(project, project / "知识源", {}, [], None, sys.modules[__name__])
+                result = governance.audit_release(release_id)
+                actual_id = result["release_id"]
+                release_root = project / "发布"
+                retrieval_pointer = release_root / "当前检索版本.json"
+                if retrieval_pointer.is_file() and retrieval_json(retrieval_pointer).get("release_id") == actual_id:
+                    retrieval_audit.audit_in_release(release_root, actual_id)
+                relation_pointer = release_root / "当前关系版本.json"
+                if relation_pointer.is_file() and retrieval_json(relation_pointer).get("release_id") == actual_id:
+                    relation_release.audit(release_root, actual_id)
+
+            print(json_text({"recovered": run_state.recover_pending(project, audit_recovered_release)}))
+            return 0
+        if args.action == "run-create":
+            _, run_config = read_config(project)
+            run_docs, run_outline = read_documents(project / "知识源")
+            del run_docs, run_config
+            selected = list(run_outline.modules) if args.all_modules else args.module_id
+            print(json_text(workflow.create(project, args.run_id, run_outline.modules, selected, args.release_id, args.batch_size, args.business_intent, args.retrieval_suite, run_outline.entries)))
+            return 0
+        if args.action in {"run-status", "run-next"}:
+            record = workflow.load(project, args.run_id)
+            status = workflow.inspect(project, record)
+            print(json_text(status if args.action == "run-status" else {"next_task": status["next_task"], "conflicts": status.get("conflicts", [])}))
+            return 0
+        if args.action == "host-next":
+            record = workflow.load(project, args.run_id)
+            status = workflow.inspect(project, record)
+            next_task = workflow._next(record) if status["next_task"] is not None else None
+            rendered = host_adapter.render(record, next_task, args.host)
+            rendered["conflicts"] = status.get("conflicts", [])
+            print(json_text(rendered))
+            return 0
+        if args.action == "run-begin":
+            print(json_text(workflow.begin(project, args.run_id, args.task_id)))
+            return 0
+        if args.action == "run-complete":
+            print(json_text(workflow.complete(project, args.run_id, args.task_id, args.actor, args.note)))
+            return 0
+        if args.action == "run-execute":
+            result = workflow.execute(project, args.run_id, args.task_id)
+            print(json_text(result))
+            return 0 if result["status"] == "completed" else 1
+        if args.action == "run-resume":
+            print(json_text(workflow.resume(project, args.run_id)))
+            return 0
+        if args.action == "run-cancel":
+            print(json_text(workflow.cancel(project, args.run_id)))
+            return 0
         if args.action == "evidence-snapshot":
             _, snapshot_config = read_config(project)
             verify_repos(snapshot_config)
@@ -1276,7 +1367,10 @@ def main() -> int:
             print(json_text({"pending_impacts": governance.impacts(args.module_id)}))
             return 0
         if args.action == "confirm-claims":
-            print(json_text(governance.confirm_claims(args.module_id)))
+            module_dir = source / governance.spec(args.module_id).relative.parent
+            with run_state.GovernanceTransaction(project, module_dir, args.action):
+                response = governance.confirm_claims(args.module_id)
+            print(json_text(response))
             return 0
         if args.action == "prepare":
             if args.auto_retrieval_metadata:
@@ -1289,17 +1383,26 @@ def main() -> int:
                 args.engineering_keywords = args.engineering_keywords or auto.get("engineering_keywords")
             if not all((args.business_topics, args.business_unknowns, args.business_keywords)):
                 raise KnowledgeError("prepare 需提供业务检索字段，或启用 --auto-retrieval-metadata 并在正文中找到依据")
-            print(json_text(governance.prepare(
-                args.module_id, args.business_topics, args.business_unknowns, args.business_keywords,
-                args.engineering_topics, args.engineering_unknowns, args.engineering_keywords,
-                args.files, args.refresh,
-            )))
+            module_dir = source / governance.spec(args.module_id).relative.parent
+            with run_state.GovernanceTransaction(project, module_dir, args.action):
+                response = governance.prepare(
+                    args.module_id, args.business_topics, args.business_unknowns, args.business_keywords,
+                    args.engineering_topics, args.engineering_unknowns, args.engineering_keywords,
+                    args.files, args.refresh,
+                )
+            print(json_text(response))
             return 0
         if args.action == "approve":
-            print(json_text(governance.approve(args.module_id, args.reviewed_by, args.reviewed_at, args.approval_note)))
+            module_dir = source / governance.spec(args.module_id).relative.parent
+            with run_state.GovernanceTransaction(project, module_dir, args.action):
+                response = governance.approve(args.module_id, args.reviewed_by, args.reviewed_at, args.approval_note)
+            print(json_text(response))
             return 0
         if args.action == "policy-review":
-            print(json_text(governance.policy_review(args.module_id, args.evidence_file, args.executed_by)))
+            module_dir = source / governance.spec(args.module_id).relative.parent
+            with run_state.GovernanceTransaction(project, module_dir, args.action):
+                response = governance.policy_review(args.module_id, args.evidence_file, args.executed_by)
+            print(json_text(response))
             return 0
         governance.approvals(selected, for_publish=args.action == "publish")
         qa_rows = [row for doc in docs if doc.doc_type == "spec" and "## 问答自测" in doc.body for row in table_rows(doc.body, "## 问答自测", "| 类别 | 真实问题 | 预期行为 | 实测结果 | 结论 |")]
@@ -1376,6 +1479,8 @@ def main() -> int:
         stage_release = staging / "发布"
         backup_release = staging / "原发布"
         installed = False
+        publish_transaction = None
+        transaction_closed = False
         try:
             business_stage, engineering_stage = stage_release / "业务版", stage_release / "研发版"
             specs = {doc.module_id: doc for doc in docs if doc.doc_type == "spec"}
@@ -1414,6 +1519,7 @@ def main() -> int:
             if governance.relations:
                 relation_release.build(stage_release, args.release_id, governance.relations, specs)
                 relation_release.audit(stage_release, args.release_id)
+            publish_transaction = run_state.PublishTransaction(project, staging, args.release_id)
             if governance.release_root.exists():
                 os.replace(governance.release_root, backup_release)
             os.replace(stage_release, governance.release_root)
@@ -1425,19 +1531,62 @@ def main() -> int:
                 result["relations"] = relation_release.audit(governance.release_root, args.release_id)
             result["current_release"] = pointer
             result["next_step"] = f"提交整个 发布/ 并建议创建标签 kb-{args.release_id}；提交前不要开始下一次发布"
+            publish_transaction.finish()
+            transaction_closed = True
         except Exception:
-            if installed and governance.release_root.exists():
-                os.replace(governance.release_root, stage_release)
-            if backup_release.exists() and not governance.release_root.exists():
-                os.replace(backup_release, governance.release_root)
+            if publish_transaction is not None:
+                if installed and governance.release_root.exists():
+                    os.replace(governance.release_root, stage_release)
+                if backup_release.exists() and not governance.release_root.exists():
+                    os.replace(backup_release, governance.release_root)
+                publish_transaction.finish()
+                transaction_closed = True
             raise
         finally:
-            shutil.rmtree(staging)
+            if publish_transaction is None or transaction_closed:
+                shutil.rmtree(staging)
         print(json.dumps(result, ensure_ascii=False, indent=2))
         return 0
     except (OSError, ValueError, UnicodeError, json.JSONDecodeError, KnowledgeError) as exc:
+        _last_error_code.set(getattr(exc, "code", None) or (
+            "E_IO" if isinstance(exc, OSError) else
+            "E_VALIDATION" if isinstance(exc, KnowledgeError) else
+            "E_INVALID_STATE" if isinstance(exc, ValueError) else "E_COMMAND_FAILED"
+        ))
         print(f"知识库处理失败：{exc}", file=sys.stderr)
         return 1
+    finally:
+        if locked:
+            lock.__exit__(None, None, None)
+
+
+def main() -> int:
+    arguments = sys.argv[1:]
+    _last_error_code.set(None)
+    if not any(arguments[index:index + 2] == ["--output", "json"] for index in range(len(arguments) - 1)):
+        return _main()
+    standard, diagnostic = io.StringIO(), io.StringIO()
+    try:
+        with contextlib.redirect_stdout(standard), contextlib.redirect_stderr(diagnostic):
+            code = _main()
+    except SystemExit as exc:
+        code = exc.code if isinstance(exc.code, int) else 1
+    raw = standard.getvalue().strip()
+    try:
+        result = json.loads(raw) if raw else None
+    except json.JSONDecodeError:
+        result = {"text": raw}
+    message = diagnostic.getvalue().strip()
+    command = next((item for item in arguments if item in ACTIONS), None)
+    envelope = {"response_schema_version": "0.1", "command": command,
+                "status": "completed" if code == 0 else "failed",
+                "error_code": None if code == 0 else "E_ARGUMENT" if "usage:" in message else _last_error_code.get() or "E_COMMAND_FAILED",
+                "result": result, "diagnostics": message.splitlines() if message else [],
+                "next_steps": [] if code == 0 else ["先检查诊断信息；如有未完成事务，执行 recover 后再重试"]}
+    print(json_text(envelope))
+    if message:
+        print(message, file=sys.stderr)
+    return code
 
 
 if __name__ == "__main__":

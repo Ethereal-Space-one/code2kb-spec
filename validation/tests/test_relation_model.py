@@ -10,6 +10,7 @@ import unittest
 
 from validation import knowledge as core
 from validation.evidence_snapshot import snapshot
+from validation.governance import Governance
 from validation.fact_render import normalized_facts, render_mapped
 from validation.relation_model import RelationError, catalog, coverage, digest, load, manifest, merged_links, validate
 from validation.relation_upgrade import preview
@@ -140,6 +141,47 @@ class RelationModelTests(unittest.TestCase):
         self.data["links"][1]["to_id"] = "F-01"
         with self.assertRaisesRegex(RelationError, "跨模块身份"):
             validate(self.data, known=known, module_dir=self.module_dir, repositories=self.repositories)
+
+    def test_foreign_fact_change_invalidates_only_registered_consumer(self) -> None:
+        header = ("## 入口与调用链\n\n| fact_id | 单一结论与条件 | 证据等级 | 固定提交锚点 | 影响的知识文件 |\n"
+                  "| --- | --- | --- | --- | --- |\n")
+
+        def spec(module_id, name, body):
+            relative = Path("示例") / name / "结构化规格.md"
+            original = (f"---\nmodule_id: {module_id}\ndocument_type: spec\nreview_status: draft\n"
+                        "applicability: current\n---\n\n# 示例规格\n\n" + body)
+            path = self.source / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(original, encoding="utf-8")
+            return core.Document(relative, module_id, "示例", name, "spec", {"source_revisions": "backend=fixed"}, body, original)
+
+        provider = spec("example.provider", "供方", header + "| F-01 | 原结论 | CODE_VERIFIED | backend:Example.java:1 | 常见问答.md |\n")
+        consumer = spec("example.consumer", "消费方", header)
+        unrelated = spec("example.unrelated", "无关方", header)
+        relation = {"sha256": "a" * 64, "data": {"links": [
+            {"from_type": "fact", "from_id": "example.provider#F-01", "to_type": "topic", "to_id": "topic.query.result"}
+        ]}}
+
+        def governance(docs):
+            instance = Governance(self.root, self.source, {}, docs, None, core)
+            instance.relations = {"example.consumer": relation}
+            return instance
+
+        initial = governance([provider, consumer, unrelated])
+        self.assertTrue(any(row["fact_id"] == "RELATION" for row in initial.impacts("example.consumer")))
+        initial.confirm_claims("example.consumer")
+        approved_text = (self.source / consumer.relative).read_text(encoding="utf-8")
+        consumer = core.replace(consumer, original=approved_text, body=core.parse_frontmatter(self.source / consumer.relative)[1])
+        stable = governance([provider, consumer, unrelated])
+        self.assertEqual(stable.impacts("example.consumer"), [])
+        changed = core.replace(provider, body=provider.body.replace("原结论", "新结论"))
+        changed_governance = governance([changed, consumer, unrelated])
+        self.assertTrue(any(row["fact_id"] == "RELATION" for row in changed_governance.impacts("example.consumer")))
+        self.assertEqual(changed_governance.impacts("example.unrelated"), [])
+        deleted = core.replace(provider, body=header)
+        deleted_governance = governance([deleted, consumer, unrelated])
+        self.assertTrue(any(row["fact_id"] == "RELATION" for row in deleted_governance.impacts("example.consumer")))
+        self.assertEqual(deleted_governance.impacts("example.unrelated"), [])
 
     def test_cross_module_fact_renders_from_owning_spec(self) -> None:
         self.spec.body += ("\n## 规范化事实\n\n| fact_id | 适用条件 | 结论 | 例外与失败 | 未知边界 |\n"

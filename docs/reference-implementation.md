@@ -4,6 +4,8 @@
 
 工程 0.4.0 另外提供可选检索扩展：`retrieval-build`、`retrieval-evaluate`、`retrieval-audit`、`retrieval-query`、`retrieval-compare`，以及显式 `publish --with-retrieval`。检索数据契约独立于 0.8.3 基础 registry；默认命令行为不变。
 
+工程 0.6.0 新增可选[本地接续执行器](0.6.0-runner.md)：项目锁、运行账本、治理与发布恢复、分批任务及 Claude Code 薄适配。执行记录不能代替批准或发布审计。
+
 安装开发版本后可使用：
 
 ```bash
