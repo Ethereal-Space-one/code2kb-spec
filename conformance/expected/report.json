@@ -1,10 +1,10 @@
 {
   "schema_version": "1.0",
-  "spec_version": "0.8.3",
+  "spec_version": "c2kb-file/1",
   "implementation_version": "0.6.0",
   "requirements_total": 61,
   "requirements_covered": 61,
-  "cases_total": 3,
-  "cases_passed": 3,
+  "cases_total": 4,
+  "cases_passed": 4,
   "status": "passed"
 }

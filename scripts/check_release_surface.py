@@ -29,7 +29,8 @@ def main() -> int:
     if not re.fullmatch(r"\d+\.\d+\.\d+", version):
         failures.append("VERSION 必须是发布用的 X.Y.Z 工程版本")
     package_version = match(r'^version = "([^"]+)"$', read("pyproject.toml"), "包版本", failures)
-    protocol = match(r'^STANDARD_VERSION = "([^"]+)"$', read("validation/knowledge.py"), "文件协议标识", failures)
+    protocol = match(r'^DEFAULT_VERSION = "([^"]+)"$', read("validation/protocol.py"), "新项目文件协议标识", failures)
+    legacy_protocol = match(r'^LEGACY_VERSION = "([^"]+)"$', read("validation/protocol.py"), "历史文件协议标识", failures)
 
     if package_version != version:
         failures.append(f"VERSION {version} 与 pyproject.toml {package_version} 不一致")
@@ -58,8 +59,8 @@ def main() -> int:
         "当前工程的兼容矩阵表行",
         failures,
     )
-    if current_row.strip() != f"`{protocol}`":
-        failures.append("兼容矩阵的当前工程与文件协议标识不一致")
+    if f"`{legacy_protocol}`" not in current_row:
+        failures.append("已发布工程的历史文件协议标识不一致")
     if re.search(rf"^\| `{re.escape(series)}` \|[^\n]*候选", compatibility, re.MULTILINE):
         failures.append("已发布工程在兼容矩阵中仍标为候选")
 
@@ -68,8 +69,8 @@ def main() -> int:
     if template.get("standard_version") != protocol:
         failures.append("新项目配置模板的协议标识与校验器不一致")
     if report.get("spec_version") != protocol:
-        failures.append("一致性预期报告的协议标识与校验器不一致")
-    if f"`standard_version` 必须为 `{protocol}`" not in read("spec/00-规范说明.md"):
+        failures.append("一致性报告的协议标识与新项目默认值不一致")
+    if f"新知识项目的 `standard_version` 必须为 `{protocol}`" not in read("spec/00-规范说明.md"):
         failures.append("基础规范的协议标识与校验器不一致")
 
     if failures:
@@ -77,7 +78,7 @@ def main() -> int:
         for failure in failures:
             print(f"- {failure}")
         return 1
-    print(f"发布版本边界检查通过：工程 {version}；文件协议 {protocol}")
+    print(f"工作树版本边界检查通过：工程基线 {version}；新项目文件协议 {protocol}；历史兼容 {legacy_protocol}")
     return 0
 
 

@@ -1,6 +1,6 @@
 # 官方参考实现
 
-`validation/` 是 Code2KB Spec 0.8.3 的官方 Python 参考实现。它使用标准库，覆盖项目检查、影响队列、候选准备、人工批准、策略审核、发布和纯产物审计。
+`validation/` 是 Code2KB Spec 的 Python 参考实现。它使用标准库，覆盖项目检查、影响队列、候选准备、审核、发布和纯产物审计。0.7 候选分支的新项目默认采用 `c2kb-file/1`，仍读取和审计历史 `0.8.3` 项目。
 
 工程 0.4.0 另外提供可选检索扩展：`retrieval-build`、`retrieval-evaluate`、`retrieval-audit`、`retrieval-query`、`retrieval-compare`，以及显式 `publish --with-retrieval`。检索数据契约独立于 0.8.3 基础 registry；默认命令行为不变。
 

@@ -18,6 +18,7 @@ CONFORMANCE = ROOT / "conformance"
 REQUIREMENT = re.compile(r"\*\*(C2KB-[A-Z]+-[0-9]{3})\*\*")
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+from validation import protocol
 
 
 class ConformanceError(ValueError):
@@ -78,7 +79,7 @@ def validate_coverage(ids: list[str]) -> dict:
     if not isinstance(value, dict) or set(value) != {"schema_version", "spec_version", "requirements"}:
         raise ConformanceError("coverage.json 字段不完整或含未知字段")
     mapping = value["requirements"]
-    if value["schema_version"] != "1.0" or value["spec_version"] != "0.8.3" or not isinstance(mapping, dict):
+    if value["schema_version"] != "1.0" or value["spec_version"] != protocol.DEFAULT_VERSION or not isinstance(mapping, dict):
         raise ConformanceError("coverage.json 版本或 requirements 无效")
     if set(mapping) != set(ids):
         missing = sorted(set(ids) - set(mapping))
@@ -153,7 +154,7 @@ def build_report() -> dict:
     version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
     return {
         "schema_version": "1.0",
-        "spec_version": "0.8.3",
+        "spec_version": protocol.DEFAULT_VERSION,
         "implementation_version": version,
         "requirements_total": len(ids),
         "requirements_covered": len(ids),

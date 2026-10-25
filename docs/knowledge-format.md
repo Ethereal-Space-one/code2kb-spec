@@ -1,12 +1,12 @@
 # 知识文件格式
 
-Code2KB Spec 工程 `0.3.0` 实现知识规范 `0.8.3`。规范性要求见 [`SPEC.md`](../SPEC.md)，本文件只提供快速说明。
+Code2KB Spec 0.7 候选实现为新项目使用 `c2kb-file/1`，继续兼容已有 `0.8.3` 项目。规范性要求见 [`SPEC.md`](../SPEC.md)，本文件只提供快速说明。
 
 ## 配置
 
 `知识库配置.json` 至少包含：
 
-- `standard_version: 0.8.3`；
+- 新项目 `standard_version: c2kb-file/1`；已有项目可保留 `0.8.3`；
 - `knowledge_source_root`；
 - 一个或多个源码仓库路径和固定 Git 提交；
 - `coverage_terms`；

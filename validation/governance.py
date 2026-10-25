@@ -462,7 +462,7 @@ class Governance:
                 and item["meta"]["evidence_type"] == "business"
             }
             if not rows:
-                if module_business_evidence and self.config["standard_version"] == self.core.STANDARD_VERSION:
+                if module_business_evidence and self.core.protocol.supports(self.config["standard_version"], "business_evidence"):
                     raise ValueError(f"{spec.relative}: 已登记业务证据但没有业务意图表")
                 continue
             fact_rows = {
@@ -685,10 +685,10 @@ class Governance:
         if evidence_ids != self.bound_evidence_ids(manifest.module_id):
             raise ValueError("运行证据清单变化；重新准备模块发布包")
         intent_doc = next((doc for doc in self.module_docs(manifest.module_id) if doc.doc_type == "intent"), None)
-        if self.config["standard_version"] == self.core.STANDARD_VERSION:
+        if self.core.protocol.supports(self.config["standard_version"], "intent_included"):
             intent_included = manifest.meta.get("intent_included")
             if intent_included not in {"true", "false"}:
-                raise ValueError("0.8.3 发布清单须记录 intent_included")
+                raise ValueError("发布清单须记录 intent_included")
             selected_intent = any(doc.doc_type == "intent" and heading == "## 发布文件" for doc, heading in result.values())
             if (intent_included == "true") != selected_intent or (intent_included == "true" and not intent_doc):
                 raise ValueError("发布清单的 intent_included 与本次候选文件不一致")
@@ -1043,7 +1043,7 @@ class Governance:
         if set(value) != registry_fields:
             raise ValueError("版本清单字段不完整或含未知字段")
         generated_by = value.get("generated_by")
-        if not isinstance(value, dict) or value.get("release_id") != release_id or value.get("standard_version") != self.core.STANDARD_VERSION or not isinstance(generated_by, dict) or set(generated_by) != {"name", "version"} or generated_by.get("name") != "Code2KB Spec" or not isinstance(generated_by.get("version"), str) or not generated_by["version"] or not isinstance(value.get("created_at"), str) or not isinstance(value.get("views"), dict) or set(value["views"]) != {"business", "engineering"} or not self.core.HEX_COMMIT.fullmatch(value.get("document_commit", "")):
+        if not isinstance(value, dict) or value.get("release_id") != release_id or not self.core.protocol.supports(value.get("standard_version"), "registry_2") or not isinstance(generated_by, dict) or set(generated_by) != {"name", "version"} or generated_by.get("name") != "Code2KB Spec" or not isinstance(generated_by.get("version"), str) or not generated_by["version"] or not isinstance(value.get("created_at"), str) or not isinstance(value.get("views"), dict) or set(value["views"]) != {"business", "engineering"} or not self.core.HEX_COMMIT.fullmatch(value.get("document_commit", "")):
             raise ValueError("版本清单结构或身份无效")
         schema = value.get("registry_schema_version")
         if schema != "2.0":

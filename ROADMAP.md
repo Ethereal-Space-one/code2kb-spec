@@ -48,7 +48,9 @@ Code2KB Spec 的目标是把固定源码快照转换为有证据、适合检索�
 - 提供 Claude Code 首个 Host Adapter，Codex 复用同一契约顺序执行；
 - 失败、阻塞和取消不能被记录为完成，发布仍须获得明确授权。
 
-## 计划：0.7.0 多语言 Adapter 平台
+## 实施中：0.7.0 多语言 Adapter 平台与公开协议编号
+
+详细范围、顺序和回归门槛见[0.7.0 实施计划](docs/0.7.0-implementation-plan.md)；Adapter 候选输出见[Adapter 契约](docs/adapter-contract.md)，协议迁移另由 [Issue #5](https://github.com/Ethereal-Space-one/code2kb-spec/issues/5) 跟踪。工程尚未发布 `v0.7.0`。
 
 - 发布统一 Adapter SDK、能力声明和契约测试；
 - 将语言支持分为 L1 文件级、L2 结构级和 L3 语义级；
@@ -57,6 +59,7 @@ Code2KB Spec 的目标是把固定源码快照转换为有证据、适合检索�
 - 为 Shell、SQL、HTML/CSS、YAML、JSON、TOML 等辅助语言提供文件级或结构级能力；
 - 支持混合语言仓库和有证据的跨语言桥接边，无法证明的关系保持 unresolved；
 - 每个官方 Adapter 必须提供 manifest、固定夹具、能力边界和回归结果。
+- 从固定源码候选走到经复核的业务、研发与检索知识；候选数量不能替代知识质量验收。
 
 ## 计划：1.0.0 可解释增量更新与稳定集成
 

@@ -8,6 +8,12 @@
       "expected": "valid"
     },
     {
+      "case_id": "config-public-protocol-valid",
+      "kind": "project_config",
+      "file": "valid/public-config.json",
+      "expected": "valid"
+    },
+    {
       "case_id": "config-unsafe-environment-expression",
       "kind": "project_config",
       "file": "invalid/unsafe-environment-path.json",

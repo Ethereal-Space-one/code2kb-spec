@@ -1,4 +1,4 @@
-"""Derive topic-sized retrieval units from an audited 0.8.3 release."""
+"""Derive topic-sized retrieval units from an audited supported release."""
 
 from __future__ import annotations
 
@@ -34,7 +34,7 @@ def project_profile(project: Path) -> str:
 
 
 def metadata_candidates(docs) -> dict[str, str]:
-    """Conservative source-backed suggestions for existing 0.8.3 manifest fields."""
+    """Conservative source-backed suggestions for compatible manifest fields."""
     result = {}
     for audience in AUDIENCES:
         allowed = SOURCE_ORDER[audience]
