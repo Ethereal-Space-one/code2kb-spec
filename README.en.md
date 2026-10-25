@@ -54,7 +54,7 @@ The optional [relation and evidence extension](docs/relation-contract.md) adds f
 
 ## What's new in 0.6.0
 
-The optional [local resumable runner](docs/0.6.0-runner.md) adds a durable task ledger, project locking, crash recovery, batch checkpoints, and thin Claude Code and Codex adapters. The ledger does not grant approval. Existing projects can keep using the standalone commands and the `0.8.3` knowledge format. See the [implementation plan](docs/0.6.0-implementation-plan.md).
+The optional [local resumable runner](docs/0.6.0-runner.md) adds a durable task ledger, project locking, crash recovery, batch checkpoints, and thin Claude Code and Codex adapters. The ledger does not grant approval. Existing projects need not enable it or republish for this change. See [versioning](docs/versioning.md) for file-format compatibility and the [implementation plan](docs/0.6.0-implementation-plan.md) for scope.
 
 ## Boundaries
 
