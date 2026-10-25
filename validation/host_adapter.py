@@ -1,4 +1,4 @@
-"""Stateless Claude Code rendering of the shared 0.6 task contract."""
+"""Stateless Host rendering of the shared 0.6 task contract."""
 
 from __future__ import annotations
 
@@ -18,14 +18,19 @@ INSTRUCTIONS = {
 }
 
 
-def render(run: dict, task: dict | None) -> dict:
+HOSTS = frozenset({"claude-code", "codex"})
+
+
+def render(run: dict, task: dict | None, host: str) -> dict:
+    if host not in HOSTS:
+        raise ValueError(f"不支持的 Host：{host}")
     if task is None:
-        return {"adapter_schema_version": "0.1", "host": "claude-code", "run_id": run["run_id"], "task": None}
+        return {"adapter_schema_version": "0.1", "host": host, "run_id": run["run_id"], "task": None}
     kind = task["kind"]
     if kind not in INSTRUCTIONS:
-        raise ValueError(f"Claude Code 不支持的任务类型：{kind}")
+        raise ValueError(f"Host 不支持的任务类型：{kind}")
     result = {
-        "adapter_schema_version": "0.1", "host": "claude-code", "run_id": run["run_id"],
+        "adapter_schema_version": "0.1", "host": host, "run_id": run["run_id"],
         "task": {key: task[key] for key in ("task_id", "kind", "module_id", "depends_on", "allowed_write_set", "status", "attempt")},
         "instruction": INSTRUCTIONS[kind],
         "start": f"code2kb run-begin --project-root <知识项目> --run-id {run['run_id']} --task-id {task['task_id']}",

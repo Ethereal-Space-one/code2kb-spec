@@ -10,6 +10,7 @@ from unittest.mock import patch
 import test_knowledge as fixture
 from validation import workflow
 from validation import knowledge
+from validation import host_adapter
 
 
 class WorkflowTests(fixture.unittest.TestCase):
@@ -55,14 +56,31 @@ class WorkflowTests(fixture.unittest.TestCase):
         self.assertEqual(envelope["status"], "completed")
         self.assertEqual(envelope["result"]["next_task"]["kind"], "writer")
 
-    def test_claude_host_uses_same_task_contract(self):
+    def test_hosts_use_same_task_contract_without_changing_run(self):
         self.create_run()
         native = json.loads(self.run_cli("run-next", "--run-id", "sample-001").stdout)["next_task"]
-        rendered = self.run_cli("host-next", "--run-id", "sample-001", "--host", "claude-code")
-        self.assertEqual(rendered.returncode, 0, rendered.stderr)
-        host = json.loads(rendered.stdout)
-        self.assertEqual(host["task"], native)
-        self.assertFalse(host["authorization_boundary"])
+        ledger = self.project / ".code2kb/runs/sample-001/run.json"
+        baseline = ledger.read_bytes()
+        results = {}
+        for name in ("claude-code", "codex"):
+            rendered = self.run_cli("host-next", "--run-id", "sample-001", "--host", name)
+            self.assertEqual(rendered.returncode, 0, rendered.stderr)
+            results[name] = json.loads(rendered.stdout)
+            self.assertEqual(results[name]["host"], name)
+            self.assertEqual(results[name]["task"], native)
+            self.assertFalse(results[name]["authorization_boundary"])
+        self.assertEqual(ledger.read_bytes(), baseline)
+        self.assertEqual({key: value for key, value in results["codex"].items() if key != "host"},
+                         {key: value for key, value in results["claude-code"].items() if key != "host"})
+
+    def test_codex_publish_task_keeps_explicit_authorization_boundary(self):
+        self.create_run()
+        record = workflow.load(self.project, "sample-001")
+        publish = next(task for task in record["tasks"] if task["kind"] == "publish")
+        rendered = host_adapter.render(record, publish, "codex")
+        self.assertTrue(rendered["authorization_boundary"])
+        self.assertTrue(rendered["publish_requires_explicit_authorization"])
+        self.assertEqual(rendered["release_id"], "release-001")
 
     def test_business_intent_task_is_optional(self):
         self.create_run()
@@ -145,8 +163,10 @@ class WorkflowTests(fixture.unittest.TestCase):
         next_task = json.loads(self.run_cli("run-next", "--run-id", "sample-001").stdout)
         self.assertIsNone(next_task["next_task"])
         self.assertIn("outline_changed", next_task["conflicts"])
-        host = json.loads(self.run_cli("host-next", "--run-id", "sample-001", "--host", "claude-code").stdout)
-        self.assertIsNone(host["task"])
+        for name in ("claude-code", "codex"):
+            host = json.loads(self.run_cli("host-next", "--run-id", "sample-001", "--host", name).stdout)
+            self.assertIsNone(host["task"])
+            self.assertIn("outline_changed", host["conflicts"])
 
     def test_writer_can_commit_reviewed_outline_change_to_run_baseline(self):
         self.create_run()

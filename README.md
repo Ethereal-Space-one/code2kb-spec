@@ -85,7 +85,7 @@ code2kb check --project-root /path/to/knowledge-project
 
 ## 0.6.0 候选能力
 
-可选的[本地接续执行器](docs/0.6.0-runner.md)提供任务账本、项目锁、崩溃恢复、批次检查点和 Claude Code 薄适配。账本不代替正式批准；旧知识项目无需启用它。0.6 工程继续读取 `0.8.3` 知识文件。范围与发布门槛见[实施计划](docs/0.6.0-implementation-plan.md)。
+可选的[本地接续执行器](docs/0.6.0-runner.md)提供任务账本、项目锁、崩溃恢复、批次检查点和 Claude Code／Codex 薄适配。账本不代替正式批准；旧知识项目无需启用它。0.6 工程继续读取 `0.8.3` 知识文件。范围与发布门槛见[实施计划](docs/0.6.0-implementation-plan.md)。
 
 本地候选的[实施与验证记录](docs/0.6.0-implementation-report.md)列出通过的检查及尚需 PR CI 验证的边界。
 

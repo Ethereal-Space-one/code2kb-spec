@@ -24,14 +24,14 @@ try:
     from .adapters.ts_java import scan as scan_candidates
     from .evidence_snapshot import snapshot as source_snapshot
     from .governance import Governance, json_text, atomic_write, digest, scan_business_terms
-    from . import retrieval_build, retrieval_evaluate, retrieval_audit, retrieval_profile, retrieval_query, relation_release, relation_model, relation_upgrade, fact_render, run_state, workflow, claude_host
+    from . import retrieval_build, retrieval_evaluate, retrieval_audit, retrieval_profile, retrieval_query, relation_release, relation_model, relation_upgrade, fact_render, run_state, workflow, host_adapter
     from .retrieval_model import strict_json as retrieval_json
 except ImportError:  # 兼容直接执行 validation/knowledge.py
     from adapters.uniapp_pages import read_uniapp_pages
     from adapters.ts_java import scan as scan_candidates
     from evidence_snapshot import snapshot as source_snapshot
     from governance import Governance, json_text, atomic_write, digest, scan_business_terms
-    import retrieval_build, retrieval_evaluate, retrieval_audit, retrieval_profile, retrieval_query, relation_release, relation_model, relation_upgrade, fact_render, run_state, workflow, claude_host
+    import retrieval_build, retrieval_evaluate, retrieval_audit, retrieval_profile, retrieval_query, relation_release, relation_model, relation_upgrade, fact_render, run_state, workflow, host_adapter
     from retrieval_model import strict_json as retrieval_json
 
 
@@ -1107,7 +1107,7 @@ def _main() -> int:
             sub.add_argument("--run-id", required=True)
         if action == "host-next":
             sub.add_argument("--run-id", required=True)
-            sub.add_argument("--host", choices=("claude-code",), required=True)
+            sub.add_argument("--host", choices=tuple(sorted(host_adapter.HOSTS)), required=True)
         if action == "run-create":
             selection = sub.add_mutually_exclusive_group(required=True)
             selection.add_argument("--module-id", action="append", help="可重复指定功能大纲中的模块")
@@ -1221,7 +1221,7 @@ def _main() -> int:
             record = workflow.load(project, args.run_id)
             status = workflow.inspect(project, record)
             next_task = workflow._next(record) if status["next_task"] is not None else None
-            rendered = claude_host.render(record, next_task)
+            rendered = host_adapter.render(record, next_task, args.host)
             rendered["conflicts"] = status.get("conflicts", [])
             print(json_text(rendered))
             return 0
