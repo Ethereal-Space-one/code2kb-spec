@@ -4,7 +4,7 @@
 
 Code2KB Spec is an open specification for turning fixed source revisions into traceable, reviewable, and publishable knowledge bases. The repository also provides a Python reference implementation, an AI agent skill, templates, and stack adapters.
 
-> Current project version: `0.6.0` candidate. The knowledge file protocol has its own compatibility identifier; it does not follow the version of any project using this tool.
+> Current project version: `0.6.0`. The knowledge file protocol has its own compatibility identifier; it does not follow the version of any project using this tool.
 
 ## Three layers
 
@@ -52,9 +52,9 @@ See the [retrieval contract](docs/retrieval-contract.md) and [evaluation guide](
 
 The optional [relation and evidence extension](docs/relation-contract.md) adds fixed-commit excerpt rebuilding, reviewed fact-to-topic links, coverage reports, and conservative TypeScript/Java candidates. Candidates do not become business facts automatically. See the [implementation plan](docs/0.5.0-implementation-plan.md) and [independent public evidence check](docs/0.5.0-public-evidence-check.md) for scope and validation limits.
 
-## What's planned for 0.6.0
+## What's new in 0.6.0
 
-The optional [local resumable runner](docs/0.6.0-runner.md) adds a durable task ledger, project locking, crash recovery, batch checkpoints, and a thin Claude Code adapter. The ledger does not grant approval. Existing projects can keep using the standalone commands and the `0.8.3` knowledge format. See the [implementation plan](docs/0.6.0-implementation-plan.md).
+The optional [local resumable runner](docs/0.6.0-runner.md) adds a durable task ledger, project locking, crash recovery, batch checkpoints, and thin Claude Code and Codex adapters. The ledger does not grant approval. Existing projects can keep using the standalone commands and the `0.8.3` knowledge format. See the [implementation plan](docs/0.6.0-implementation-plan.md).
 
 ## Boundaries
 

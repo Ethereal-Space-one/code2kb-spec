@@ -4,7 +4,7 @@
 
 Code2KB Spec 是一套把固定源码提交转换为可追溯、可审核、可发布知识库的开放规范，并提供 Python 参考实现、AI Agent Skill、模板和技术栈适配器。
 
-> 当前工程版本：`0.6.0` 候选。知识文件协议的兼容标识见[版本管理](docs/versioning.md)，不与任何使用本工具的知识库项目同步编号。
+> 当前工程版本：`0.6.0`。知识文件协议的兼容标识见[版本管理](docs/versioning.md)，不与任何使用本工具的知识库项目同步编号。
 
 ## 三层结构
 
@@ -83,11 +83,11 @@ code2kb check --project-root /path/to/knowledge-project
 
 可选的[关系与证据扩展](docs/relation-contract.md)提供固定提交片段重建、事实与检索主题的审核映射、覆盖报告及首批 TypeScript/Java 候选发现。它不会把候选调用自动写成业务事实；旧项目默认行为保持不变。[实施计划](docs/0.5.0-implementation-plan.md)和[独立公开证据核对](docs/0.5.0-public-evidence-check.md)记录范围与验证边界。
 
-## 0.6.0 候选能力
+## 0.6.0 新增能力
 
 可选的[本地接续执行器](docs/0.6.0-runner.md)提供任务账本、项目锁、崩溃恢复、批次检查点和 Claude Code／Codex 薄适配。账本不代替正式批准；旧知识项目无需启用它。0.6 工程继续读取 `0.8.3` 知识文件。范围与发布门槛见[实施计划](docs/0.6.0-implementation-plan.md)。
 
-本地候选的[实施与验证记录](docs/0.6.0-implementation-report.md)列出通过的检查及尚需 PR CI 验证的边界。
+[实施与验证记录](docs/0.6.0-implementation-report.md)列出通过的检查及已知边界。
 
 ## 能力边界
 
