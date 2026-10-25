@@ -7,6 +7,7 @@ import sys
 import tempfile
 from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
 
 from validation import knowledge as core
 from validation.evidence_snapshot import snapshot
@@ -14,6 +15,7 @@ from validation.governance import Governance
 from validation.fact_render import normalized_facts, render_mapped
 from validation.relation_model import RelationError, catalog, coverage, digest, load, manifest, merged_links, validate
 from validation.relation_upgrade import preview
+from validation.relation_upgrade_project import preview_project
 from validation.tests import test_knowledge as fixture
 
 
@@ -116,6 +118,130 @@ class RelationModelTests(unittest.TestCase):
         self.assertTrue(all(item["outcome"] == "changed_excerpt" for item in result["changed_evidence"]))
         self.assertNotEqual(self.repositories["backend"]["commit"], newer)
 
+    def test_project_preview_reports_changed_fact_and_unattributed_new_file(self) -> None:
+        repo = Path(self.repositories["backend"]["path"])
+        (repo / "Example.java").write_text("class Example { int value = 2; }\n", encoding="utf-8")
+        (repo / "NewEntry.java").write_text("class NewEntry {}\n", encoding="utf-8")
+        subprocess.run(["git", "-C", str(repo), "add", "."], check=True)
+        subprocess.run(["git", "-C", str(repo), "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-q", "-m", "changed answer and new entry"], check=True)
+        newer = subprocess.check_output(["git", "-C", str(repo), "rev-parse", "HEAD"], text=True).strip()
+        facts = {"example.query": [{"fact_id": "F-01", "anchors": "backend:Example.java:1", "documents": ["常见问答.md"]}]}
+        result = preview_project({"example.query": self.data}, facts, self.outline.entries,
+                                 self.repositories, "backend", newer)
+        self.assertEqual(result["must_review_facts"], [{"fact_id": "example.query#F-01", "documents": ["常见问答.md"]}])
+        self.assertEqual(result["affected_topics"], ["example.query#topic.query.result"])
+        self.assertEqual(result["unattributed_paths"], ["NewEntry.java"])
+        self.assertTrue(any(item["path"] == "NewEntry.java" and item["capability"] == "L1"
+                            for item in result["adapter"]["added_file_candidates"]))
+        self.assertEqual(result["fallback"], "full_project_review")
+        self.assertEqual(self.repositories["backend"]["commit"], result["old_commit"])
+        excluded = preview_project({"example.query": self.data}, facts, self.outline.entries,
+                                   self.repositories, "backend", newer, exclusions={"NewEntry.java": "维护者确认是样本辅助文件"})
+        self.assertEqual(excluded["explicit_exclusions"], [{"path": "NewEntry.java", "reason": "维护者确认是样本辅助文件"}])
+        self.assertEqual(excluded["unattributed_paths"], [])
+        with self.assertRaisesRegex(RelationError, "不能直接排除"):
+            preview_project({"example.query": self.data}, facts, self.outline.entries,
+                            self.repositories, "backend", newer, exclusions={"Example.java": "不可隐藏已核证路径"})
+
+    def test_project_preview_follows_verified_chain_and_reports_candidate_consumer(self):
+        repo = Path(self.repositories["backend"]["path"])
+        (repo / "Entry.java").write_text("class Entry {}\n", encoding="utf-8")
+        subprocess.run(["git", "-C", str(repo), "add", "."], check=True)
+        subprocess.run(["git", "-C", str(repo), "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-q", "-m", "entry baseline"], check=True)
+        self.repositories["backend"]["commit"] = subprocess.check_output(["git", "-C", str(repo), "rev-parse", "HEAD"], text=True).strip()
+        unchanged = snapshot("backend:Example.java:1", self.repositories)
+        changed = snapshot("backend:Entry.java:1", self.repositories)
+        for link in self.data["links"]:
+            link["evidence"] = [unchanged]
+        def edge(from_type, from_id, to_type, to_id, record, status="verified"):
+            return {"from_type": from_type, "from_id": from_id, "to_type": to_type, "to_id": to_id,
+                    "status": status, "evidence": [record] if record else []}
+        self.data["links"] += [
+            edge("entry", "ENT-001", "interface", "API-001", changed),
+            edge("interface", "API-001", "method", "METHOD-001", unchanged),
+        ]
+        consumer = {"links": [edge("fact", "example.query#F-01", "topic", "topic.consumer", None, "candidate")]}
+        (repo / "Entry.java").write_text("class Entry { boolean enabled = false; }\n", encoding="utf-8")
+        subprocess.run(["git", "-C", str(repo), "add", "."], check=True)
+        subprocess.run(["git", "-C", str(repo), "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-q", "-m", "entry changed"], check=True)
+        newer = subprocess.check_output(["git", "-C", str(repo), "rev-parse", "HEAD"], text=True).strip()
+        result = preview_project({"example.query": self.data, "example.consumer": consumer}, {}, [], self.repositories, "backend", newer)
+        self.assertEqual(result["must_review_facts"], [{"fact_id": "example.query#F-01", "documents": []}])
+        self.assertEqual(result["affected_topics"], ["example.query#topic.query.result"])
+        self.assertIn("example.consumer", result["possible_modules"])
+        self.assertEqual(result["needs_evidence"][0]["status"], "candidate")
+        consumer["links"][0].update(status="verified", evidence=[unchanged])
+        result = preview_project({"example.query": self.data, "example.consumer": consumer}, {}, [], self.repositories, "backend", newer)
+        self.assertEqual(result["affected_topics"], ["example.consumer#topic.consumer", "example.query#topic.query.result"])
+        self.assertIn("example.consumer", result["possible_modules"])
+        # A node's own evidence can change while every relation excerpt stays the same.
+        self.data["links"] = self.data["links"][:2] + [edge("config", "CFG-001", "fact", "F-01", unchanged)]
+        self.data["nodes"] = [{"kind": "config", "node_id": "CFG-001", "evidence": [changed]}]
+        result = preview_project({"example.query": self.data}, {}, [], self.repositories, "backend", newer)
+        self.assertEqual(result["must_review_facts"][0]["fact_id"], "example.query#F-01")
+        self.assertEqual(result["unattributed_paths"], [])
+        self.assertEqual(result["changed_node_evidence"][0]["outcome"], "changed_excerpt")
+        self.assertEqual(next(item["coverage"] for item in result["changed_files"]
+                              if item["path"] == "Entry.java"), "verified_evidence_changed")
+        # A fact's plain anchor is only a possible impact, including its consumers.
+        self.data["nodes"] = []
+        self.data["links"] = self.data["links"][:2]
+        facts = {"example.query": [{"fact_id": "F-01", "anchors": "backend:Entry.java:1", "documents": []}]}
+        result = preview_project({"example.query": self.data, "example.consumer": consumer}, facts, [], self.repositories, "backend", newer)
+        self.assertEqual(result["must_review_facts"], [])
+        self.assertIn("example.consumer", result["possible_modules"])
+
+    def test_added_path_adapter_failure_still_reports_full_project_review(self):
+        repo = Path(self.repositories["backend"]["path"])
+        (repo / "new.py").write_text("print('new')\n", encoding="utf-8")
+        subprocess.run(["git", "-C", str(repo), "add", "."], check=True)
+        subprocess.run(["git", "-C", str(repo), "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-q", "-m", "new source"], check=True)
+        newer = subprocess.check_output(["git", "-C", str(repo), "rev-parse", "HEAD"], text=True).strip()
+        with patch("validation.adapters.platform.BuiltinMixedAdapter.scan", side_effect=ValueError("scan failed")):
+            result = preview_project({}, {}, [], self.repositories, "backend", newer)
+        self.assertEqual(result["fallback"], "full_project_review")
+        self.assertEqual(result["adapter"]["unresolved"][0]["reason"], "adapter_scan_failed")
+
+    def test_project_preview_does_not_claim_unmodified_excerpt_changed(self) -> None:
+        repo = Path(self.repositories["backend"]["path"])
+        (repo / "Example.java").write_text("class Example { int value = 1; }\n// unrelated\n", encoding="utf-8")
+        subprocess.run(["git", "-C", str(repo), "add", "."], check=True)
+        subprocess.run(["git", "-C", str(repo), "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-q", "-m", "unrelated line"], check=True)
+        newer = subprocess.check_output(["git", "-C", str(repo), "rev-parse", "HEAD"], text=True).strip()
+        result = preview_project({"example.query": self.data}, {}, self.outline.entries,
+                                 self.repositories, "backend", newer)
+        self.assertEqual(result["must_review_facts"], [])
+        self.assertEqual({row["outcome"] for row in result["changed_evidence"]}, {"unchanged_excerpt"})
+        self.assertEqual(result["fallback"], "module_review")
+
+    def test_project_preview_reports_line_relocation_without_verifying_it(self) -> None:
+        repo = Path(self.repositories["backend"]["path"])
+        original = (repo / "Example.java").read_text(encoding="utf-8")
+        (repo / "Example.java").write_text("// new header\n" + original, encoding="utf-8")
+        subprocess.run(["git", "-C", str(repo), "add", "-A"], check=True)
+        subprocess.run(["git", "-C", str(repo), "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-q", "-m", "move line"], check=True)
+        newer = subprocess.check_output(["git", "-C", str(repo), "rev-parse", "HEAD"], text=True).strip()
+        result = preview_project({"example.query": self.data}, {}, self.outline.entries,
+                                 self.repositories, "backend", newer)
+        self.assertEqual({item["outcome"] for item in result["changed_evidence"]}, {"changed_excerpt"})
+        self.assertTrue(all(item["relocation_line_candidates"] == [2] for item in result["changed_evidence"]))
+        self.assertEqual(result["must_review_facts"][0]["fact_id"], "example.query#F-01")
+
+    def test_project_preview_marks_identical_file_move_as_candidate(self) -> None:
+        repo = Path(self.repositories["backend"]["path"])
+        (repo / "Moved.java").write_bytes((repo / "Example.java").read_bytes())
+        (repo / "Example.java").unlink()
+        subprocess.run(["git", "-C", str(repo), "add", "-A"], check=True)
+        subprocess.run(["git", "-C", str(repo), "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-q", "-m", "move source"], check=True)
+        newer = subprocess.check_output(["git", "-C", str(repo), "rev-parse", "HEAD"], text=True).strip()
+        result = preview_project({"example.query": self.data}, {}, self.outline.entries,
+                                 self.repositories, "backend", newer)
+        self.assertEqual(result["relocation_candidates"], [{
+            "old_path": "Example.java", "new_path": "Moved.java", "basis": "identical_blob_only", "status": "candidate",
+        }])
+        self.assertEqual(result["fallback"], "full_project_review")
+        self.assertTrue(all(item["outcome"] == "missing_or_unreadable" for item in result["changed_evidence"]))
+
     def test_topic_identity_survives_display_heading_change(self) -> None:
         known, _, _ = catalog(core, self.spec, self.outline)
         old_id = self.data["topics"][0]["topic_id"]
@@ -211,6 +337,29 @@ class RelationGovernanceTests(unittest.TestCase):
 
     def save(self) -> None:
         (self.module / "关系映射.json").write_text(json.dumps(self.mapping, ensure_ascii=False) + "\n", encoding="utf-8")
+
+    def test_all_modules_preview_is_read_only_and_preserves_legacy_output(self) -> None:
+        self.save()
+        spec_path = self.module / "结构化规格.md"
+        spec_path.write_text(spec_path.read_text(encoding="utf-8").replace(
+            "| 功能与范围.md |", "| 模块概览.md、`技术实现.md` |"), encoding="utf-8")
+        repo = Path(self.example.repos["backend"]["path"])
+        (repo / "dummy.txt").write_text("changed backend evidence\n", encoding="utf-8")
+        subprocess.run(["git", "-C", str(repo), "add", "."], check=True)
+        subprocess.run(["git", "-C", str(repo), "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-q", "-m", "next source"], check=True)
+        newer = subprocess.check_output(["git", "-C", str(repo), "rev-parse", "HEAD"], text=True).strip()
+        old_config = (self.example.project / "知识库配置.json").read_bytes()
+        args = ("--repository-id", "backend", "--new-commit", newer)
+        project = self.example.run_cli("preview-upgrade", "--all-modules", *args)
+        self.assertEqual(project.returncode, 0, project.stderr)
+        result = json.loads(project.stdout)
+        self.assertEqual(result["schema_version"], "0.2")
+        self.assertEqual(result["must_review_facts"][0]["fact_id"], "example.order.query#FACT-001")
+        self.assertEqual(result["must_review_facts"][0]["documents"], sorted(["模块概览.md", "技术实现.md"]))
+        legacy = self.example.run_cli("preview-upgrade", "--module-id", "example.order.query", *args)
+        self.assertEqual(legacy.returncode, 0, legacy.stderr)
+        self.assertEqual(json.loads(legacy.stdout)["schema_version"], "0.1")
+        self.assertEqual((self.example.project / "知识库配置.json").read_bytes(), old_config)
 
     def approve_mapping(self) -> None:
         self.save()

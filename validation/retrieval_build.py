@@ -65,8 +65,11 @@ def metadata_candidates(docs) -> dict[str, str]:
         result[f"{audience}_unknowns"] = joined(unknowns)
     return result
 HEADING = re.compile(r"(?m)^#{2,4}\s+(.+?)\s*$")
+FIRST_HEADING = re.compile(r"(?m)^#\s+(.+?)\s*$")
 FACT = re.compile(r"(?<![\w.-])(?:F-[0-9]+[a-z]?|FACT-[0-9]+)(?![\w-])")
 LINK = re.compile(r"(?<!!)\[([^\]]+)\]\(([^)]+)\)")
+GENERIC_TITLES = {"说明", "概述", "适用条件", "已确认的适用条件", "主流程", "分支与失败", "回答边界", "尚不能确定的结果", "平台与角色差异"}
+SHARED_CONTEXT_TITLES = {"适用条件", "已确认的适用条件", "回答边界", "尚不能确定的结果"}
 
 
 def sections(body: str, filename: str):
@@ -94,6 +97,63 @@ def sections(body: str, filename: str):
             yield filename.removesuffix(".md"), content
 
 
+def index_sections(body: str, filename: str) -> list[tuple[str, str, list[str]]]:
+    """Keep source heading identities while preserving shared answer boundaries."""
+    original = list(sections(body, filename))
+    if not original:
+        return []
+    headings = [match[1].strip().strip("：:") for match in HEADING.finditer(body)]
+    if any(title in SHARED_CONTEXT_TITLES for title in headings):
+        # A rule or exception in a sibling section cannot safely be assigned to
+        # one answer by a lexical parser. Keep the whole source instead.
+        title_match = FIRST_HEADING.search(body)
+        title = title_match[1].strip() if title_match else filename.removesuffix(".md")
+        return [(title, body.strip(), list(dict.fromkeys(headings)))]
+    selected = []
+    for match in HEADING.finditer(body):
+        level = len(match[0]) - len(match[0].lstrip("#"))
+        title = match[1].strip().strip("：:")
+        is_question = bool(re.match(r"(?:问|Q\d*)[:：]|.*[？?]$", title, flags=re.I))
+        is_detail = filename in {"接口与调用.md", "方法与源码.md"} and bool(re.fullmatch(r"(?:API|METHOD)-[A-Za-z0-9-]+", title))
+        if level == 2 or (level == 3 and (is_question or is_detail)):
+            selected.append((match, level, title))
+    if not selected:
+        return [(title, content, [title]) for title, content in original]
+    results = []
+    # Text before the first section applies to every extracted answer as well.
+    document_intro = FIRST_HEADING.sub("", body[:selected[0][0].start()], count=1).strip()
+    parent_title = ""
+    parent_intro = ""
+    for index, (match, level, title) in enumerate(selected):
+        end = selected[index + 1][0].start() if index + 1 < len(selected) else len(body)
+        content = body[match.end():end].strip()
+        if level == 2:
+            parent_title, parent_intro = title, content
+            has_children = index + 1 < len(selected) and selected[index + 1][1] == 3
+            if content and not has_children and title not in {"目录", "事实编号对照", "索引", "接口索引", "方法索引"}:
+                combined = f"{document_intro}\n\n{content}" if document_intro else content
+                results.append((title, combined, [title]))
+        elif content:
+            combined = "\n\n".join(part for part in (document_intro, parent_intro, content) if part)
+            names = [parent_title, title] if parent_title else [title]
+            display = f"{parent_title} · {title}" if parent_title else title
+            results.append((display, combined, names))
+    return results
+
+
+def readable_module_title(body: str, filename: str) -> str:
+    match = FIRST_HEADING.search(body)
+    if not match:
+        return filename.removesuffix(".md")
+    title = match[1].strip()
+    suffix = filename.removesuffix(".md")
+    for separator in ("：", ":", "·", "-"):
+        ending = separator + suffix
+        if title.endswith(ending):
+            return title[: -len(ending)].strip()
+    return title
+
+
 def question_variants(title: str) -> str:
     text = re.sub(r"^(?:问|Q\d*)[:：]\s*", "", title, flags=re.I).strip()
     return text
@@ -106,8 +166,11 @@ def clean_title(title: str) -> str:
 def rewrite_links(content: str, source: Path, destination: Path) -> str:
     def rewrite(match):
         target = match[2]
-        if target.startswith(("#", "http://", "https://", "mailto:")):
+        if target.startswith(("http://", "https://", "mailto:")):
             return match[0]
+        if target.startswith("#"):
+            relative = os.path.relpath(source, destination.parent).replace(os.sep, "/")
+            return f"[{match[1]}]({relative}{target})"
         source_target = (source.parent / unquote(target.split("#", 1)[0])).resolve()
         if not source_target.is_file():
             return match[0]
@@ -171,6 +234,7 @@ def build_in_release(release_root: Path, release_id: str, profile: str, generate
                 grouped[source.parent.relative_to(source_root).as_posix()][source.name] = source
         for module_dir, by_name in sorted(grouped.items()):
             seen = {}
+            generic_units = {}
             identities = defaultdict(int)
             for filename in SOURCE_ORDER[audience]:
                 source = by_name.get(filename)
@@ -180,22 +244,52 @@ def build_in_release(release_root: Path, release_id: str, profile: str, generate
                 module_id = meta.get("module_id", "")
                 if not module_id:
                     raise RetrievalError(f"发布正文缺少 module_id：{source}")
-                for title, content in sections(body, filename):
-                    title = clean_title(title)
+                module_title = clean_title(readable_module_title(body, filename))
+                for raw_title, content, source_headings in index_sections(body, filename):
+                    title = clean_title(raw_title)
+                    if title in GENERIC_TITLES:
+                        title = clean_title(f"{module_title} · {title}")
                     if not title:
                         continue
                     source_local = source.relative_to(source_root).as_posix()
                     normalized = re.sub(r"\s+", "", content)
                     if normalized in seen:
                         original = seen[normalized]
+                        old_meta, old_body = read_unit(original["path"])
+                        old_headings = old_meta["source_headings"].split(" | ")
+                        new_source = source_local not in original["entry"]["source_documents"]
+                        new_heading = any(heading not in old_headings for heading in source_headings)
                         if source_local not in original["entry"]["source_documents"]:
                             original["entry"]["source_documents"].append(source_local)
-                            old_meta, old_body = read_unit(original["path"])
+                        if new_source or new_heading:
                             old_meta["source_documents"] = " | ".join(original["entry"]["source_documents"])
-                            old_meta["source_headings"] += " | " + title
-                            old_body = old_body.rstrip() + f"\n- {source_local} · {title}\n"
+                            old_meta["source_headings"] = " | ".join(dict.fromkeys(old_headings + source_headings))
+                            old_body = old_body.rstrip() + f"\n- {source_local} · {' | '.join(source_headings)}\n"
                             original["path"].write_bytes(render_unit(old_meta, old_body))
                         duplicates.append({"audience": audience, "module_id": module_id, "source": source_local, "same_as": original["source"]})
+                        continue
+                    if raw_title in GENERIC_TITLES and title in generic_units:
+                        original = generic_units[title]
+                        destination = original["path"]
+                        rewritten = rewrite_links(content, source, destination)
+                        old_meta, old_body = read_unit(destination)
+                        if "\n## 出处\n\n" not in old_body:
+                            raise RetrievalError("检索单元缺少出处段")
+                        addition = f"\n### {filename} · {raw_title}\n\n{rewritten}\n"
+                        old_body = old_body.replace("\n## 出处\n\n", addition + "\n## 出处\n\n", 1)
+                        old_body = old_body.rstrip() + f"\n- {source_local} · {' | '.join(source_headings)}\n"
+                        original["entry"]["source_documents"].append(source_local)
+                        old_meta["source_documents"] = " | ".join(original["entry"]["source_documents"])
+                        old_meta["source_headings"] += " | " + " | ".join(source_headings)
+                        if audience == "engineering":
+                            facts = sorted((set(old_meta["fact_ids"].split(",")) | set(FACT.findall(content))) - {""})
+                            old_meta["fact_ids"] = ",".join(facts)
+                            old_meta["traceability_level"] = "fact" if facts else "document"
+                        if audience == "business" and business_scanner is not None:
+                            business_scanner(old_body, str(destination))
+                        destination.write_bytes(render_unit(old_meta, old_body))
+                        read_unit(destination)
+                        seen[normalized] = original
                         continue
                     identity = (filename, title)
                     identities[identity] += 1
@@ -204,7 +298,7 @@ def build_in_release(release_root: Path, release_id: str, profile: str, generate
                     destination = target_root / local_unit
                     destination.parent.mkdir(parents=True, exist_ok=True)
                     rewritten = rewrite_links(content, source, destination)
-                    body_text = f"# {title}\n\n## 结论与边界\n\n{rewritten}\n\n## 出处\n\n- {source_local} · {title}\n"
+                    body_text = f"# {title}\n\n模块：{module_title}\n\n## 结论与边界\n\n{rewritten}\n\n## 出处\n\n- {source_local} · {' | '.join(source_headings)}\n"
                     if audience == "business" and business_scanner is not None:
                         business_scanner(body_text, str(destination))
                     facts = sorted(set(FACT.findall(content))) if audience == "engineering" else []
@@ -212,7 +306,7 @@ def build_in_release(release_root: Path, release_id: str, profile: str, generate
                         "document_type": "retrieval_unit", "retrieval_schema_version": SCHEMA,
                         "unit_id": unit_id, "module_id": module_id, "audience": audience,
                         "topic": title, "question_variants": question_variants(title),
-                        "source_documents": source_local, "source_headings": title,
+                        "source_documents": source_local, "source_headings": " | ".join(source_headings),
                         "fact_ids": ",".join(facts), "traceability_level": "fact" if facts else "document",
                         "release_id": release_id,
                     }
@@ -221,6 +315,8 @@ def build_in_release(release_root: Path, release_id: str, profile: str, generate
                     item = {"unit_id": unit_id, "module_id": module_id, "audience": audience, "path": f"发布/检索版/{'业务' if audience == 'business' else '研发'}/{local_unit}", "topic": title, "source_documents": [source_local]}
                     units.append(item)
                     seen[normalized] = {"source": source_local, "entry": item, "path": destination}
+                    if raw_title in GENERIC_TITLES:
+                        generic_units[title] = seen[normalized]
     if not any(item["audience"] == "business" for item in units):
         raise RetrievalError("基础发布没有可生成的业务检索单元")
     candidates = []
@@ -266,6 +362,52 @@ def build_in_release(release_root: Path, release_id: str, profile: str, generate
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
     manifest_path.write_bytes(json_bytes(manifest))
     return manifest
+
+
+def coverage_report(registry: dict, retrieval: dict, release_root: Path | None = None) -> dict:
+    """Explain published files omitted by the optional retrieval extension."""
+    if registry.get("release_id") != retrieval.get("release_id"):
+        raise RetrievalError("检索覆盖报告的基础发布与检索发布不一致")
+    omissions = []
+    conservative_groups = []
+    navigation = {"目录.md", "功能大纲.md", "检索索引.md", "发布信息.md"}
+    for audience in AUDIENCES:
+        indexed = {
+            path for item in retrieval["units"] if item["audience"] == audience
+            for path in item["source_documents"]
+        }
+        for path in sorted(registry["views"][audience]["files"]):
+            if path in indexed:
+                continue
+            filename = Path(path).name
+            if filename == "术语表.md":
+                reason = "glossary_not_in_retrieval_extension"
+            elif filename in navigation:
+                reason = "navigation_only"
+            elif filename in SOURCE_ORDER[audience]:
+                reason = "no_indexable_section"
+            else:
+                reason = "not_in_retrieval_source_order"
+            omissions.append({"audience": audience, "source_path": f"发布/{'业务版' if audience == 'business' else '研发版'}/{path}", "reason": reason})
+        if release_root is not None:
+            for path in sorted(indexed):
+                source = release_root / ("业务版" if audience == "business" else "研发版") / path
+                _, body = source_meta(source)
+                shared = sorted({match[1].strip().strip("：:") for match in HEADING.finditer(body)} & SHARED_CONTEXT_TITLES)
+                if shared:
+                    conservative_groups.append({
+                        "audience": audience,
+                        "source_path": f"发布/{'业务版' if audience == 'business' else '研发版'}/{path}",
+                        "shared_headings": shared,
+                        "reason": "whole_source_kept_to_preserve_answer_boundaries",
+                        "review_required": True,
+                    })
+    return {
+        "schema_version": "0.1", "release_id": retrieval["release_id"],
+        "indexed_units": len(retrieval["units"]), "omissions": omissions,
+        "conservative_groups": conservative_groups,
+        "coverage_is_complete": not any(item["reason"] != "navigation_only" for item in omissions),
+    }
 
 
 def build(project: Path, release_id: str, profile: str, core) -> dict:

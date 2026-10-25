@@ -10,3 +10,14 @@
 | 同上 | 同上 | `backend/src/main/java/org/springframework/samples/petclinic/rest/controller/v1/OwnerRestControllerV1.java` | `19291723b9b2f6545595f098116cbf3fd5ee5676aa55ae20f8079b51b5b2d883` |
 
 测试在临时目录分别建立两个 Git 仓库，以这些原文件形成可重现的固定快照。Adapter 只提出保守候选；测试中的跨仓库关系由明确标注的人工源码锚点核对，不能解读成自动解析能力，也不能证明实际部署、权限或线上回答质量。
+
+0.8 升级演练在临时后端仓库中生成一个受控第二提交：把姓氏筛选条件从仅检查 `null` 改成同时排除空白字符串。该提交不是上游发布，也没有运行 PetClinic 服务。两个临时源码快照固定提交时间，完整提交号记录在 [检索运行记录](fts5-run.json) 中；原始四个文件保持不变。
+
+回归通过实际发布、关系审计和 `preview-upgrade --all-modules` 命令验证影响定位；修订后重新取证、批准、发布和审计。词法基线与 SQLite FTS5 使用相同业务单元、三个相同问题及 `top_k=1`，分别记录排名，包含一个无关词零命中的控制项。正文限定保全、受众隔离与出处定位通过断言检查；不据此宣称模型最终回答已验证。
+
+重新生成运行记录：
+
+```sh
+CODE2KB_RECORD_PUBLIC_FTS=conformance/public-source/petclinic/fts5-run.json \
+  python3 -B -m unittest discover -s validation/tests -p test_petclinic_public_source.py -q
+```

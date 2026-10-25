@@ -60,6 +60,10 @@ The optional [local resumable runner](docs/0.6.0-runner.md) adds a durable task 
 
 New projects default to the independent `c2kb-file/1` file protocol identifier. Existing `0.8.3` projects retain their validation, publishing, and audit path; migration requires an explicit preview and apply step. Multilanguage adapters emit fixed-revision candidates, capability declarations, and conservative relationship clues. Candidates still need human evidence review before becoming knowledge facts. An independent [Spring PetClinic public sample](docs/0.7.0-public-sample-review.md) exercises manually anchored facts through both published views and retrieval units; it does not establish automatic cross-repository pairing or live behavior. See the [implementation and review record](docs/0.7.0-implementation-report.md).
 
+## 0.8.0 release candidate
+
+The optional retrieval view conservatively retains conditions and unknowns that span sections, merges generic headings within a module, and reports omitted glossaries and whole-source units needing review. A read-only [project-wide source-upgrade preview](docs/source-upgrade-preview.md) compares fixed Git commits and locates changed evidence, facts, topics, available retrieval units, and unattributed paths. A controlled two-commit PetClinic sample runs actual SQLite FTS5 over generated units; it establishes narrow retrieval evidence, not final model-answer or production correctness. The [retrieval import contract](docs/retrieval-contract.md) describes staged snapshot replacement. Default two-view publishing and the knowledge file protocol remain unchanged.
+
 ## Boundaries
 
 Code2KB validates deterministic structure, fixed source anchors, digests, audience separation, and governance records. It does not prove natural-language correctness, production behavior, business policy, authorization decisions, external report truth, or reviewer identity.
