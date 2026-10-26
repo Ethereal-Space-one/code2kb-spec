@@ -58,7 +58,58 @@ def _release_inputs(project: Path) -> dict[str, str | None]:
     return result
 
 
-def build(project: Path, source: Path, preview: dict) -> dict:
+def _migration_scope(project: Path, source: Path, preview: dict, docs: list, relations: dict,
+                     full_project_review: bool) -> dict:
+    """Expose the global write set even when semantic review selects one module."""
+    source_name = source.relative_to(project).as_posix()
+    repository_id = preview["repository_id"]
+    changed = {row["path"] for row in preview["changed_files"]}
+    by_module: dict[str, dict] = {}
+    for doc in docs:
+        module_id = doc.module_id
+        if not module_id:
+            continue
+        row = by_module.setdefault(module_id, {"module_id": module_id, "source_revision_files": [],
+                                               "review_reset_files": [], "manifest_files": [],
+                                               "relation_file": None, "evidence_records_requiring_review": 0,
+                                               "evidence_records_rebuildable": 0})
+        local = f"{source_name}/{doc.relative.as_posix()}"
+        revisions = doc.meta.get("source_revisions", "")
+        if f"{repository_id}=" in revisions:
+            row["source_revision_files"].append(local)
+        if doc.meta.get("review_status") in {"reviewed", "policy_reviewed"}:
+            row["review_reset_files"].append(local)
+        if doc.doc_type == "release_manifest":
+            row["manifest_files"].append(local)
+        if doc.doc_type == "spec":
+            relation_path = source / doc.relative.parent / "关系映射.json"
+            if relation_path.is_file():
+                row["relation_file"] = relation_path.relative_to(project).as_posix()
+    for module_id, relation in relations.items():
+        row = by_module.get(module_id)
+        if row is None:
+            continue
+        data = relation["data"]
+        records = [record for node in data.get("nodes", []) for record in node.get("evidence", [])]
+        records += [record for link in relation["links"] for record in link.get("evidence", [])]
+        for record in records:
+            if record["repository_id"] != repository_id:
+                continue
+            key = "evidence_records_requiring_review" if record["path"] in changed else "evidence_records_rebuildable"
+            row[key] += 1
+    modules = []
+    for row in by_module.values():
+        for key in ("source_revision_files", "review_reset_files", "manifest_files"):
+            row[key].sort()
+        row["semantic_review_required"] = full_project_review or row["module_id"] in preview["possible_modules"]
+        modules.append(row)
+    return {"global_write_set": ["知识库配置.json", f"{source_name}/功能大纲.md"],
+            "modules": sorted(modules, key=lambda row: row["module_id"]),
+            "status": "read_only_proposal_not_applied",
+            "approval_rule": "all_changed_packages_require_new_explicit_review"}
+
+
+def build(project: Path, source: Path, preview: dict, docs: list, relations: dict) -> dict:
     """Describe a review candidate; never mutate the project or authorize execution."""
     head, dirty = _git_baseline(project)
     snapshot = {
@@ -111,6 +162,7 @@ def build(project: Path, source: Path, preview: dict) -> dict:
         "affected_topics": preview["affected_topics"],
         "published_unit_ids": preview["published_unit_ids"],
         "needs_evidence": preview["needs_evidence"],
+        "baseline_migration": _migration_scope(project, source, preview, docs, relations, not bool(selected)),
         "execution_gate": "baseline_migration_and_explicit_review_required",
         "note": "只读候选计划；未选模块仍需迁移固定提交与证据，旧批准不得自动继承。",
     }

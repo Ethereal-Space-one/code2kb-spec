@@ -1307,7 +1307,8 @@ def _main() -> int:
                     {module_id: {**item["data"], "links": item["links"]} for module_id, item in preview_governance.relations.items()},
                     facts, preview_outline.entries, preview_config["repositories"],
                     args.repository_id, args.new_commit, topic_units, exclusions)
-                print(json_text(upgrade_plan.build(project, preview_source, result) if args.plan else result))
+                print(json_text(upgrade_plan.build(project, preview_source, result, preview_docs,
+                                                   preview_governance.relations) if args.plan else result))
                 return 0
             if args.exclude_path:
                 raise KnowledgeError("--exclude-path 仅支持全项目模式")

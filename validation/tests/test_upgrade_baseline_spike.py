@@ -91,8 +91,17 @@ class UpgradeBaselineSpikeTests(unittest.TestCase):
             new = subprocess.check_output(['git','-C',str(backend),'rev-parse','HEAD'],text=True).strip()
             plan = sample.run_cli('preview-upgrade','--all-modules','--plan','--repository-id','backend','--new-commit',new)
             self.assertEqual(plan.returncode, 0, plan.stderr)
-            self.assertEqual(json.loads(plan.stdout)['decision'], 'selected_modules')
-            self.assertEqual(json.loads(plan.stdout)['selected_modules'], ['sample.order.delivery'])
+            candidate = json.loads(plan.stdout)
+            self.assertEqual(candidate['decision'], 'selected_modules')
+            self.assertEqual(candidate['selected_modules'], ['sample.order.delivery'])
+            migration = {row['module_id']: row for row in candidate['baseline_migration']['modules']}
+            self.assertEqual(set(migration), {'sample.order.delivery', 'sample.account.profile'})
+            self.assertFalse(migration['sample.account.profile']['semantic_review_required'])
+            self.assertTrue(migration['sample.account.profile']['source_revision_files'])
+            self.assertEqual(migration['sample.account.profile']['evidence_records_rebuildable'], 1)
+            self.assertEqual(migration['sample.account.profile']['evidence_records_requiring_review'], 0)
+            self.assertTrue(migration['sample.account.profile']['review_reset_files'])
+            self.assertEqual(len(migration['sample.account.profile']['manifest_files']), 1)
             account_business = (account/'功能与范围.md').read_bytes()
             original_account_record = json.loads((account/'关系映射.json').read_text())['links'][0]['evidence'][0]
 

@@ -365,6 +365,8 @@ class RelationGovernanceTests(unittest.TestCase):
         self.assertEqual(dirty.returncode, 0, dirty.stderr)
         self.assertEqual(json.loads(dirty.stdout)["decision"], "full_project_review")
         self.assertIn("knowledge_worktree_dirty", json.loads(dirty.stdout)["fallback_reasons"])
+        self.assertTrue(all(row["semantic_review_required"] for row in
+                            json.loads(dirty.stdout)["baseline_migration"]["modules"]))
         subprocess.run(["git", "-C", str(self.example.project), "add", "知识源"], check=True)
         subprocess.run(["git", "-C", str(self.example.project), "-c", "user.name=Fixture",
                         "-c", "user.email=fixture@example.invalid", "commit", "-q", "-m", "record mapping"], check=True)
