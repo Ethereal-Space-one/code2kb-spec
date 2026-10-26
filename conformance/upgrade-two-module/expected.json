@@ -1,0 +1,24 @@
+{
+  "schema_version": "0.1",
+  "source_license": "Apache-2.0",
+  "repository_id": "sample",
+  "changed_paths": ["src/main/java/example/OrderRule.java"],
+  "modules": [
+    {
+      "module_id": "sample.order.delivery",
+      "source_path": "src/main/java/example/OrderRule.java",
+      "must_reinterpret": true,
+      "base_answer": "订单金额达到 100 个货币单位时免配送费，否则配送费为 5 个单位。",
+      "target_answer": "订单金额达到 80 个货币单位时免配送费，否则配送费为 5 个单位。"
+    },
+    {
+      "module_id": "sample.account.profile",
+      "source_path": "src/main/java/example/AccountRule.java",
+      "must_reinterpret": false,
+      "base_answer": "仅资料本人可以查看自己的资料。",
+      "target_answer": "仅资料本人可以查看自己的资料。"
+    }
+  ],
+  "global_revision_migration_required": true,
+  "old_approval_may_be_reused_without_review": false
+}
