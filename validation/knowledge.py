@@ -20,6 +20,7 @@ import tempfile
 from urllib.parse import unquote
 
 try:
+    from .business_urls import contains_source_repository_url
     from .adapters.ts_java import scan as scan_candidates
     from .adapters import ADAPTER_NAMES, get_adapter
     from .evidence_snapshot import snapshot as source_snapshot
@@ -27,6 +28,7 @@ try:
     from . import retrieval_build, retrieval_evaluate, retrieval_audit, retrieval_profile, retrieval_query, relation_release, relation_model, relation_upgrade, relation_upgrade_project, fact_render, run_state, workflow, host_adapter, protocol, protocol_migration
     from .retrieval_model import strict_json as retrieval_json
 except ImportError:  # 兼容直接执行 validation/knowledge.py
+    from business_urls import contains_source_repository_url
     from adapters.ts_java import scan as scan_candidates
     from adapters import ADAPTER_NAMES, get_adapter
     from evidence_snapshot import snapshot as source_snapshot
@@ -393,6 +395,8 @@ def read_documents(source: Path) -> tuple[list[Document], Outline]:
             except ValueError as exc:
                 raise KnowledgeError(f"{relative}: reviewed_at 须为 YYYY-MM-DD") from exc
         if expected in BUSINESS:
+            if contains_source_repository_url(body):
+                raise KnowledgeError(f"{relative}: 业务文件含源码仓库链接；请移至研发专属内容")
             if set(meta) - BUSINESS_METADATA or TECHNICAL.search(body) or BUSINESS_FORBIDDEN.search(body):
                 raise KnowledgeError(f"{relative}: 业务文件含明显技术内容或过程用语；请移至技术实现或过程文件")
         if expected in ENGINEERING and meta["review_status"] in {"reviewed", "policy_reviewed"}:
@@ -1044,7 +1048,7 @@ def publish_boundary(config: dict, engineering: bool, outline: Outline,
     return lines + notes
 
 
-def validate_bundle(root: Path, engineering: bool) -> None:
+def validate_bundle(root: Path, engineering: bool, *, source_urls: bool = True) -> None:
     """Check the actual reader-visible tree, including generated navigation."""
     root = root.resolve(strict=True)
     for path in root.rglob("*.md"):
@@ -1065,7 +1069,7 @@ def validate_bundle(root: Path, engineering: bool) -> None:
         if plain:
             raise KnowledgeError(f"发布物有未链接的文件引用：{relative} → {plain.group(0)}")
         if not engineering:
-            scan_business_terms(sys.modules[__name__], body, relative.as_posix())
+            scan_business_terms(sys.modules[__name__], body, relative.as_posix(), source_urls=source_urls)
         for target in LINK.findall(body):
             if target.startswith(("http://", "https://", "mailto:")) or target.startswith("#"):
                 continue

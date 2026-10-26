@@ -172,6 +172,19 @@ class KnowledgeTests(unittest.TestCase):
             env=env,
         )
 
+    def test_business_source_rejects_repository_url_without_technical_label(self):
+        overview = self.module / "模块概览.md"
+        write(overview, overview.read_text(encoding="utf-8") + "\n[参考](https://github.com/example/repo/blob/abc1234/README.md#L3)\n")
+        result = self.run_cli("check")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("业务文件含源码仓库链接", result.stderr)
+
+    def test_business_source_allows_ordinary_web_url(self):
+        overview = self.module / "模块概览.md"
+        write(overview, overview.read_text(encoding="utf-8") + "\n[帮助](https://example.invalid/help/orders)\n")
+        docs, _ = core.read_documents(self.source)
+        self.assertTrue(any(doc.relative.name == "模块概览.md" for doc in docs))
+
     def use_environment_repository_paths(self) -> dict[str, str]:
         config_path = self.project / "知识库配置.json"
         config = json.loads(config_path.read_text(encoding="utf-8"))
