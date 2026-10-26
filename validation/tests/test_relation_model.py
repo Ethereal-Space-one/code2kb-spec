@@ -379,9 +379,26 @@ class RelationGovernanceTests(unittest.TestCase):
         self.assertEqual(plan["execution_gate"], "baseline_migration_and_explicit_review_required")
         self.assertEqual(plan["plan_sha256"], json.loads(self.example.run_cli(
             "preview-upgrade", "--all-modules", "--plan", *args).stdout)["plan_sha256"])
+        accepted = self.example.run_cli("preview-upgrade", "--all-modules", "--plan",
+                                        "--expect-plan-sha256", plan["plan_sha256"], *args)
+        self.assertEqual(accepted.returncode, 0, accepted.stderr)
+        empty_digest = self.example.run_cli("preview-upgrade", "--all-modules", "--plan",
+                                            "--expect-plan-sha256", "", *args)
+        self.assertNotEqual(empty_digest.returncode, 0)
+        self.assertIn("已过期", empty_digest.stderr)
+        config_path = self.example.project / "知识库配置.json"
+        config_path.write_bytes(old_config + b"\n")
+        stale_inputs = self.example.run_cli("preview-upgrade", "--all-modules", "--plan",
+                                            "--expect-plan-sha256", plan["plan_sha256"], *args)
+        self.assertNotEqual(stale_inputs.returncode, 0)
+        self.assertIn("已过期", stale_inputs.stderr)
+        config_path.write_bytes(old_config)
         self.assertEqual((self.example.project / "知识库配置.json").read_bytes(), old_config)
         invalid = self.example.run_cli("preview-upgrade", "--module-id", "example.order.query", "--plan", *args)
         self.assertNotEqual(invalid.returncode, 0)
+        invalid_empty = self.example.run_cli("preview-upgrade", "--module-id", "example.order.query",
+                                              "--expect-plan-sha256", "", *args)
+        self.assertNotEqual(invalid_empty.returncode, 0)
         (repo / "unmapped.txt").write_text("new external behavior\n", encoding="utf-8")
         subprocess.run(["git", "-C", str(repo), "add", "unmapped.txt"], check=True)
         subprocess.run(["git", "-C", str(repo), "-c", "user.name=Fixture",
@@ -393,6 +410,11 @@ class RelationGovernanceTests(unittest.TestCase):
         self.assertEqual(json.loads(unknown.stdout)["decision"], "full_project_review")
         self.assertIn("unattributed_changed_paths", json.loads(unknown.stdout)["fallback_reasons"])
         self.assertIn("added_deleted_or_type_changed_path", json.loads(unknown.stdout)["fallback_reasons"])
+        stale = self.example.run_cli("preview-upgrade", "--all-modules", "--plan",
+                                     "--expect-plan-sha256", plan["plan_sha256"], "--repository-id", "backend",
+                                     "--new-commit", unknown_commit)
+        self.assertNotEqual(stale.returncode, 0)
+        self.assertIn("已过期", stale.stderr)
 
     def approve_mapping(self) -> None:
         self.save()

@@ -1171,6 +1171,7 @@ def _main() -> int:
             preview_scope.add_argument("--module-id")
             preview_scope.add_argument("--all-modules", action="store_true")
             sub.add_argument("--plan", action="store_true", help="全项目模式下输出绑定输入摘要的只读复核候选计划")
+            sub.add_argument("--expect-plan-sha256", help="复算候选计划并核对先前保存的摘要；不接受过期输入")
             sub.add_argument("--repository-id", required=True)
             sub.add_argument("--new-commit", required=True)
             sub.add_argument("--exclude-path", action="append", default=[], metavar="PATH=REASON",
@@ -1307,13 +1308,22 @@ def _main() -> int:
                     {module_id: {**item["data"], "links": item["links"]} for module_id, item in preview_governance.relations.items()},
                     facts, preview_outline.entries, preview_config["repositories"],
                     args.repository_id, args.new_commit, topic_units, exclusions)
-                print(json_text(upgrade_plan.build(project, preview_source, result, preview_docs,
-                                                   preview_governance.relations) if args.plan else result))
+                if args.expect_plan_sha256 is not None and not args.plan:
+                    raise KnowledgeError("--expect-plan-sha256 仅支持 --plan")
+                planned = (upgrade_plan.build(project, preview_source, result, preview_docs,
+                                              preview_governance.relations,
+                                              list(preview_outline.modules), parse_frontmatter) if args.plan else result)
+                if args.expect_plan_sha256 is not None and (not re.fullmatch(r"[0-9a-f]{64}", args.expect_plan_sha256)
+                                                            or planned["plan_sha256"] != args.expect_plan_sha256):
+                    raise KnowledgeError("升级候选计划已过期；重新生成并核对输入后再继续")
+                print(json_text(planned))
                 return 0
             if args.exclude_path:
                 raise KnowledgeError("--exclude-path 仅支持全项目模式")
             if args.plan:
                 raise KnowledgeError("--plan 仅支持全项目模式")
+            if args.expect_plan_sha256 is not None:
+                raise KnowledgeError("--expect-plan-sha256 仅支持全项目 --plan")
             preview_spec = next((doc for doc in preview_docs if doc.doc_type == "spec" and doc.module_id == args.module_id), None)
             if preview_spec is None:
                 raise KnowledgeError("升级预览模块没有结构化规格")
