@@ -361,6 +361,36 @@ class RelationGovernanceTests(unittest.TestCase):
         self.assertEqual(json.loads(legacy.stdout)["schema_version"], "0.1")
         self.assertEqual((self.example.project / "知识库配置.json").read_bytes(), old_config)
 
+        dirty = self.example.run_cli("preview-upgrade", "--all-modules", "--plan", *args)
+        self.assertEqual(dirty.returncode, 0, dirty.stderr)
+        self.assertEqual(json.loads(dirty.stdout)["decision"], "full_project_review")
+        self.assertIn("knowledge_worktree_dirty", json.loads(dirty.stdout)["fallback_reasons"])
+        subprocess.run(["git", "-C", str(self.example.project), "add", "知识源"], check=True)
+        subprocess.run(["git", "-C", str(self.example.project), "-c", "user.name=Fixture",
+                        "-c", "user.email=fixture@example.invalid", "commit", "-q", "-m", "record mapping"], check=True)
+        planned = self.example.run_cli("preview-upgrade", "--all-modules", "--plan", *args)
+        self.assertEqual(planned.returncode, 0, planned.stderr)
+        plan = json.loads(planned.stdout)
+        self.assertEqual(plan["schema_version"], "1.0")
+        self.assertEqual(plan["decision"], "selected_modules")
+        self.assertEqual(plan["selected_modules"], ["example.order.query"])
+        self.assertEqual(plan["execution_gate"], "baseline_migration_and_explicit_review_required")
+        self.assertEqual(plan["plan_sha256"], json.loads(self.example.run_cli(
+            "preview-upgrade", "--all-modules", "--plan", *args).stdout)["plan_sha256"])
+        self.assertEqual((self.example.project / "知识库配置.json").read_bytes(), old_config)
+        invalid = self.example.run_cli("preview-upgrade", "--module-id", "example.order.query", "--plan", *args)
+        self.assertNotEqual(invalid.returncode, 0)
+        (repo / "unmapped.txt").write_text("new external behavior\n", encoding="utf-8")
+        subprocess.run(["git", "-C", str(repo), "add", "unmapped.txt"], check=True)
+        subprocess.run(["git", "-C", str(repo), "-c", "user.name=Fixture",
+                        "-c", "user.email=fixture@example.invalid", "commit", "-q", "-m", "unmapped path"], check=True)
+        unknown_commit = subprocess.check_output(["git", "-C", str(repo), "rev-parse", "HEAD"], text=True).strip()
+        unknown = self.example.run_cli("preview-upgrade", "--all-modules", "--plan", "--repository-id", "backend",
+                                       "--new-commit", unknown_commit)
+        self.assertEqual(unknown.returncode, 0, unknown.stderr)
+        self.assertEqual(json.loads(unknown.stdout)["decision"], "full_project_review")
+        self.assertIn("unattributed_changed_paths", json.loads(unknown.stdout)["fallback_reasons"])
+
     def approve_mapping(self) -> None:
         self.save()
         impact = self.example.run_cli("impact", "--module-id", "example.order.query")

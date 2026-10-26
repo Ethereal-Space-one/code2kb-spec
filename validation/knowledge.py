@@ -25,7 +25,7 @@ try:
     from .adapters import ADAPTER_NAMES, get_adapter
     from .evidence_snapshot import snapshot as source_snapshot
     from .governance import Governance, json_text, atomic_write, digest, scan_business_terms
-    from . import retrieval_build, retrieval_evaluate, retrieval_audit, retrieval_profile, retrieval_query, relation_release, relation_model, relation_upgrade, relation_upgrade_project, fact_render, run_state, workflow, host_adapter, protocol, protocol_migration
+    from . import retrieval_build, retrieval_evaluate, retrieval_audit, retrieval_profile, retrieval_query, relation_release, relation_model, relation_upgrade, relation_upgrade_project, fact_render, run_state, workflow, host_adapter, protocol, protocol_migration, upgrade_plan
     from .retrieval_model import strict_json as retrieval_json
 except ImportError:  # 兼容直接执行 validation/knowledge.py
     from business_urls import contains_source_repository_url
@@ -33,7 +33,7 @@ except ImportError:  # 兼容直接执行 validation/knowledge.py
     from adapters import ADAPTER_NAMES, get_adapter
     from evidence_snapshot import snapshot as source_snapshot
     from governance import Governance, json_text, atomic_write, digest, scan_business_terms
-    import retrieval_build, retrieval_evaluate, retrieval_audit, retrieval_profile, retrieval_query, relation_release, relation_model, relation_upgrade, relation_upgrade_project, fact_render, run_state, workflow, host_adapter, protocol, protocol_migration
+    import retrieval_build, retrieval_evaluate, retrieval_audit, retrieval_profile, retrieval_query, relation_release, relation_model, relation_upgrade, relation_upgrade_project, fact_render, run_state, workflow, host_adapter, protocol, protocol_migration, upgrade_plan
     from retrieval_model import strict_json as retrieval_json
 
 
@@ -1170,6 +1170,7 @@ def _main() -> int:
             preview_scope = sub.add_mutually_exclusive_group(required=True)
             preview_scope.add_argument("--module-id")
             preview_scope.add_argument("--all-modules", action="store_true")
+            sub.add_argument("--plan", action="store_true", help="全项目模式下输出绑定输入摘要的只读复核候选计划")
             sub.add_argument("--repository-id", required=True)
             sub.add_argument("--new-commit", required=True)
             sub.add_argument("--exclude-path", action="append", default=[], metavar="PATH=REASON",
@@ -1306,10 +1307,12 @@ def _main() -> int:
                     {module_id: {**item["data"], "links": item["links"]} for module_id, item in preview_governance.relations.items()},
                     facts, preview_outline.entries, preview_config["repositories"],
                     args.repository_id, args.new_commit, topic_units, exclusions)
-                print(json_text(result))
+                print(json_text(upgrade_plan.build(project, preview_source, result) if args.plan else result))
                 return 0
             if args.exclude_path:
                 raise KnowledgeError("--exclude-path 仅支持全项目模式")
+            if args.plan:
+                raise KnowledgeError("--plan 仅支持全项目模式")
             preview_spec = next((doc for doc in preview_docs if doc.doc_type == "spec" and doc.module_id == args.module_id), None)
             if preview_spec is None:
                 raise KnowledgeError("升级预览模块没有结构化规格")

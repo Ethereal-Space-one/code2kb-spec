@@ -16,3 +16,9 @@ code2kb preview-upgrade --project-root /知识项目 \
 `fallback` 只有 `none_observed`、`module_review`、`full_project_review` 三种建议。`none_observed` 仅表示当前映射没有观察到需要排队的变化，仍受 `coverage`、显式排除和外部服务边界限制。图谱未关联的路径不会因 `must_review_facts` 为空而放行。
 
 该预览只回答“下一步核查哪里”。维护者确认后，仍须修订规格和正文，再执行既有 `impact`、`confirm-claims`、`prepare`、批准、发布与审计。旧命令 `preview-upgrade --module-id ...` 的返回结构与含义保持不变。
+
+## 1.0 只读复核候选计划
+
+全项目模式可显式附加 `--plan`；不附加时仍返回上述 0.2 预览。计划使用独立的 `schema_version: 1.0`，记录旧、新源码提交、知识项目 Git 提交、配置、知识源、关系映射、发布清单及当前发布指针的摘要，并逐路径给出归属和回退原因。相同输入产生相同 `plan_sha256`。
+
+工作区有未提交改动、变化路径未归属、显式排除、Adapter 无法解析、关系未证实或变化缺少已验证证据时，计划给出 `full_project_review`。满足当前归属条件时也仅给 `selected_modules` 候选；`execution_gate` 明确要求先解决全局固定提交和证据迁移，并重新走审核。`--plan` 不创建任务、不修改知识项目，也不授权旧批准复用。双模块公开案例和完整迁移验证仍是后续门槛。
