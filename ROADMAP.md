@@ -61,7 +61,7 @@ Code2KB Spec 的目标是把固定源码快照转换为有证据、适合检索�
 - 每个官方 Adapter 必须提供 manifest、固定夹具、能力边界和回归结果。
 - 从固定源码候选走到经复核的业务、研发与检索知识；候选数量不能替代知识质量验收。
 
-## 计划：0.8.0 检索产物质量与源码升级影响
+## 已发布：0.8.0 检索产物质量与源码升级影响
 
 详细边界和验收见[0.8.0 发布规划](docs/0.8.0-implementation-plan.md)及[检索产物结构审查](docs/0.8.0-index-readiness-review.md)；新增只读命令见[全项目源码升级预览](docs/source-upgrade-preview.md)。
 
