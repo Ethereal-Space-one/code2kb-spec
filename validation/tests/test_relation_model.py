@@ -390,6 +390,7 @@ class RelationGovernanceTests(unittest.TestCase):
         self.assertEqual(unknown.returncode, 0, unknown.stderr)
         self.assertEqual(json.loads(unknown.stdout)["decision"], "full_project_review")
         self.assertIn("unattributed_changed_paths", json.loads(unknown.stdout)["fallback_reasons"])
+        self.assertIn("added_deleted_or_type_changed_path", json.loads(unknown.stdout)["fallback_reasons"])
 
     def approve_mapping(self) -> None:
         self.save()

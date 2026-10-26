@@ -83,6 +83,8 @@ def build(project: Path, source: Path, preview: dict) -> dict:
         reasons.append("adapter_unresolved")
     if preview["needs_evidence"]:
         reasons.append("unverified_relation")
+    if any(item["status"] != "M" for item in preview["changed_files"]):
+        reasons.append("added_deleted_or_type_changed_path")
     if not preview["changed_files"]:
         reasons.append("no_change_is_not_approval")
     uncertain = [item["path"] for item in preview["changed_files"]
