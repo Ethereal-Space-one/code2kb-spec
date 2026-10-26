@@ -24,14 +24,14 @@ try:
     from .adapters import ADAPTER_NAMES, get_adapter
     from .evidence_snapshot import snapshot as source_snapshot
     from .governance import Governance, json_text, atomic_write, digest, scan_business_terms
-    from . import retrieval_build, retrieval_evaluate, retrieval_audit, retrieval_profile, retrieval_query, relation_release, relation_model, relation_upgrade, fact_render, run_state, workflow, host_adapter, protocol, protocol_migration
+    from . import retrieval_build, retrieval_evaluate, retrieval_audit, retrieval_profile, retrieval_query, relation_release, relation_model, relation_upgrade, relation_upgrade_project, fact_render, run_state, workflow, host_adapter, protocol, protocol_migration
     from .retrieval_model import strict_json as retrieval_json
 except ImportError:  # 兼容直接执行 validation/knowledge.py
     from adapters.ts_java import scan as scan_candidates
     from adapters import ADAPTER_NAMES, get_adapter
     from evidence_snapshot import snapshot as source_snapshot
     from governance import Governance, json_text, atomic_write, digest, scan_business_terms
-    import retrieval_build, retrieval_evaluate, retrieval_audit, retrieval_profile, retrieval_query, relation_release, relation_model, relation_upgrade, fact_render, run_state, workflow, host_adapter, protocol, protocol_migration
+    import retrieval_build, retrieval_evaluate, retrieval_audit, retrieval_profile, retrieval_query, relation_release, relation_model, relation_upgrade, relation_upgrade_project, fact_render, run_state, workflow, host_adapter, protocol, protocol_migration
     from retrieval_model import strict_json as retrieval_json
 
 
@@ -47,7 +47,7 @@ LEGACY_STANDARD_VERSION = protocol.LEGACY_VERSION
 SUPPORTED_STANDARD_VERSIONS = protocol.SUPPORTED_VERSIONS
 ACTIONS = (
     "check", "publish", "impact", "confirm-claims", "prepare", "approve", "policy-review", "audit-release",
-    "retrieval-build", "retrieval-evaluate", "retrieval-audit", "retrieval-compare", "retrieval-query",
+    "retrieval-build", "retrieval-evaluate", "retrieval-audit", "retrieval-coverage", "retrieval-compare", "retrieval-query",
     "relation-audit", "analyze-candidates", "evidence-snapshot", "render-facts", "preview-upgrade",
     "relation-report", "recover", "run-create", "run-status", "run-next", "run-begin", "run-complete",
     "run-resume", "run-cancel", "run-execute", "host-next", "migrate-protocol",
@@ -1129,7 +1129,7 @@ def _main() -> int:
             sub.add_argument("--with-retrieval", action="store_true")
             sub.add_argument("--retrieval-suite", type=Path)
             sub.add_argument("--retrieval-profile", choices=("full", "compact"))
-        if action in {"retrieval-build", "retrieval-evaluate", "retrieval-audit"}:
+        if action in {"retrieval-build", "retrieval-evaluate", "retrieval-audit", "retrieval-coverage"}:
             sub.add_argument("--release-id", required=True)
         if action == "relation-audit":
             sub.add_argument("--release-id", required=True)
@@ -1163,9 +1163,13 @@ def _main() -> int:
         if action == "relation-report":
             sub.add_argument("--module-id", required=True)
         if action == "preview-upgrade":
-            sub.add_argument("--module-id", required=True)
+            preview_scope = sub.add_mutually_exclusive_group(required=True)
+            preview_scope.add_argument("--module-id")
+            preview_scope.add_argument("--all-modules", action="store_true")
             sub.add_argument("--repository-id", required=True)
             sub.add_argument("--new-commit", required=True)
+            sub.add_argument("--exclude-path", action="append", default=[], metavar="PATH=REASON",
+                             help="全项目模式下明确排除变化路径，须给出审核理由")
         if action in {"confirm-claims", "prepare", "approve", "policy-review"}:
             sub.add_argument("--module-id", required=True)
         if action == "impact":
@@ -1266,7 +1270,42 @@ def _main() -> int:
         if args.action == "preview-upgrade":
             preview_source, preview_config = read_config(project)
             verify_repos(preview_config)
-            preview_docs, _ = read_documents(preview_source)
+            preview_docs, preview_outline = read_documents(preview_source)
+            if args.all_modules:
+                exclusions = {}
+                for value in args.exclude_path:
+                    path, separator, reason = value.partition("=")
+                    if not separator or not path or not reason.strip() or path in exclusions:
+                        raise KnowledgeError("--exclude-path 须为不重复的 PATH=REASON")
+                    exclusions[path] = reason.strip()
+                preview_governance = Governance(project, preview_source, preview_config, preview_docs, preview_outline, sys.modules[__name__])
+                preview_governance.validate_relations()
+                facts = {}
+                for spec in (doc for doc in preview_docs if doc.doc_type == "spec"):
+                    rows = table_rows(spec.body, "## 入口与调用链", "| fact_id | 单一结论与条件 | 证据等级 | 固定提交锚点 | 影响的知识文件 |")
+                    facts[spec.module_id] = [{
+                        "fact_id": row[0], "anchors": row[3],
+                        "documents": [item.strip().strip("`") for item in re.split(r"[,，、]", row[4]) if item.strip().strip("`") not in {"", "无"}],
+                    } for row in rows]
+                topic_units = {}
+                relation_pointer = project / "发布/当前关系版本.json"
+                if relation_pointer.is_file():
+                    base = Governance(project, preview_source, preview_config, preview_docs, preview_outline, sys.modules[__name__]).audit_release(None)
+                    released = relation_release.audit(project / "发布", base["release_id"])
+                    manifest = retrieval_json(project / "发布/关系清单" / f"{released['release_id']}.json")
+                    for module_id, module in manifest["modules"].items():
+                        active = preview_governance.relations.get(module_id)
+                        if active and module["source_mapping_sha256"] == active["sha256"]:
+                            for topic in module["topics"]:
+                                topic_units[f"{module_id}#{topic['topic_id']}"] = topic["unit_ids"]
+                result = relation_upgrade_project.preview_project(
+                    {module_id: {**item["data"], "links": item["links"]} for module_id, item in preview_governance.relations.items()},
+                    facts, preview_outline.entries, preview_config["repositories"],
+                    args.repository_id, args.new_commit, topic_units, exclusions)
+                print(json_text(result))
+                return 0
+            if args.exclude_path:
+                raise KnowledgeError("--exclude-path 仅支持全项目模式")
             preview_spec = next((doc for doc in preview_docs if doc.doc_type == "spec" and doc.module_id == args.module_id), None)
             if preview_spec is None:
                 raise KnowledgeError("升级预览模块没有结构化规格")
@@ -1313,6 +1352,15 @@ def _main() -> int:
             governance = Governance(project, project / "知识源", {}, [], None, sys.modules[__name__])
             governance.audit_release(None)
             print(json_text(retrieval_audit.audit_in_release(project / "发布", args.release_id)))
+            return 0
+        if args.action == "retrieval-coverage":
+            governance = Governance(project, project / "知识源", {}, [], None, sys.modules[__name__])
+            governance.audit_release(args.release_id)
+            release_root = project / "发布"
+            retrieval_audit.audit_in_release(release_root, args.release_id, require_ready=False)
+            registry = retrieval_json(release_root / "版本清单" / f"{args.release_id}.json")
+            retrieval = retrieval_json(release_root / "检索清单" / f"{args.release_id}.json")
+            print(json_text(retrieval_build.coverage_report(registry, retrieval, release_root)))
             return 0
         if args.action == "relation-audit":
             governance = Governance(project, project / "知识源", {}, [], None, sys.modules[__name__])

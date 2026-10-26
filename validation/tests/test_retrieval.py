@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 import unittest
 
 import test_knowledge as fixtures
@@ -11,7 +12,7 @@ import test_knowledge as fixtures
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import knowledge as core
 from retrieval_evaluate import evaluate_data, load_suite
-from retrieval_build import metadata_candidates
+from retrieval_build import build_in_release, coverage_report, index_sections, metadata_candidates
 from retrieval_model import RetrievalError, digest, json_bytes, read_unit
 from retrieval_profile import compare
 
@@ -260,6 +261,100 @@ class RetrievalTests(unittest.TestCase):
         result = metadata_candidates(selected)
         self.assertIn("订单查询", result["business_topics"])
         self.assertEqual(result["business_unknowns"], "")
+
+    def test_generated_units_keep_conditions_unknown_and_readable_topic(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            release = root / "发布"
+            business = release / "业务版/订单/订单查询"
+            business.mkdir(parents=True)
+            flow = business / "业务流程.md"
+            flow.write_text(
+                "---\nmodule_id: example.order.query\n---\n\n"
+                "# 订单查询：业务流程\n\n## 适用条件\n\n仅限已登录用户。\n\n"
+                "## 主流程\n\n[见条件](#适用条件) 返回当前用户的订单。\n\n"
+                "## 回答边界\n\n跨租户结果未验证。\n", encoding="utf-8")
+            overview = business / "模块概览.md"
+            overview.write_text(
+                "---\nmodule_id: example.order.query\n---\n\n"
+                "# 订单查询：模块概览\n\n## 说明\n\n用户可查看订单。\n\n## 重复回答\n\n用户可查看订单。\n", encoding="utf-8")
+            registry = {
+                "release_id": "index-context", "views": {
+                    "business": {"path": "发布/业务版", "files": {
+                        "订单/订单查询/业务流程.md": digest(flow.read_bytes()),
+                        "订单/订单查询/模块概览.md": digest(overview.read_bytes()),
+                    }},
+                    "engineering": {"path": "发布/研发版", "files": {}},
+                },
+                "created_at": "2026-10-25T00:00:00Z",
+            }
+            manifest = release / "版本清单/index-context.json"
+            manifest.parent.mkdir(parents=True)
+            manifest.write_bytes(json_bytes(registry))
+            (release / "研发版").mkdir()
+            (release / "当前版本.json").write_bytes(json_bytes({
+                "release_id": "index-context", "registry_path": "发布/版本清单/index-context.json",
+                "registry_sha256": digest(manifest.read_bytes()),
+            }))
+            built = build_in_release(release, "index-context", "full", {"name": "test", "version": "0.8"})
+            units = {}
+            for entry in built["units"]:
+                meta, body = read_unit(root / entry["path"])
+                units[meta["topic"]] = (meta, body)
+            flow_meta, flow_body = units["订单查询：业务流程"]
+            self.assertIn("仅限已登录用户", flow_body)
+            self.assertIn("返回当前用户的订单", flow_body)
+            self.assertIn("跨租户结果未验证", flow_body)
+            self.assertIn("适用条件", flow_meta["source_headings"])
+            self.assertIn("回答边界", flow_meta["source_headings"])
+            self.assertIn("业务版/订单/订单查询/业务流程.md#适用条件", flow_body)
+            self.assertIn("订单查询 · 说明", units)
+            self.assertIn("重复回答", units["订单查询 · 说明"][0]["source_headings"])
+            self.assertIn("模块：订单查询", units["订单查询 · 说明"][1])
+            report = coverage_report(registry, built, release)
+            self.assertEqual(report["conservative_groups"], [{
+                "audience": "business", "source_path": "发布/业务版/订单/订单查询/业务流程.md",
+                "shared_headings": ["回答边界", "适用条件"],
+                "reason": "whole_source_kept_to_preserve_answer_boundaries", "review_required": True,
+            }])
+
+    def test_nested_question_keeps_parent_condition(self):
+        sections = index_sections(
+            "# 订单查询\n\n## 查询结果\n\n仅限已登录用户。\n\n"
+            "### 问：能看到什么？\n\n返回当前用户订单。\n", "常见问答.md")
+        self.assertEqual(len(sections), 1)
+        self.assertEqual(sections[0][2], ["查询结果", "问：能看到什么？"])
+        self.assertIn("仅限已登录用户", sections[0][1])
+        self.assertIn("返回当前用户订单", sections[0][1])
+
+    def test_document_preamble_is_preserved_in_each_answer(self):
+        sections = index_sections(
+            "# 订单查询\n\n仅限已登录用户；跨租户未验证。\n\n"
+            "## 查询\n\n返回当前用户订单。\n\n"
+            "## 失败\n\n### 问：无结果时怎么办？\n\n显示空列表。\n", "常见问答.md")
+        self.assertEqual(len(sections), 2)
+        for _, content, _ in sections:
+            self.assertIn("仅限已登录用户；跨租户未验证", content)
+
+    def test_coverage_reports_glossary_without_claiming_indexed(self):
+        registry = {"release_id": "sample", "views": {
+            "business": {"files": {"术语表.md": "x", "目录.md": "x", "订单/模块概览.md": "x"}},
+            "engineering": {"files": {}},
+        }}
+        retrieval = {"release_id": "sample", "units": [{
+            "audience": "business", "source_documents": ["订单/模块概览.md"],
+        }]}
+        report = coverage_report(registry, retrieval)
+        self.assertFalse(report["coverage_is_complete"])
+        self.assertEqual(report["omissions"], [
+            {"audience": "business", "source_path": "发布/业务版/术语表.md", "reason": "glossary_not_in_retrieval_extension"},
+            {"audience": "business", "source_path": "发布/业务版/目录.md", "reason": "navigation_only"},
+        ])
+        self.publish()
+        self.build()
+        output = self.fixture.run_cli("retrieval-coverage", "--release-id", "retrieval-test")
+        self.assertEqual(output.returncode, 0, output.stderr)
+        self.assertEqual(json.loads(output.stdout)["release_id"], "retrieval-test")
 
 
 if __name__ == "__main__":

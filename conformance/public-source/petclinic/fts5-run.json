@@ -1,0 +1,123 @@
+{
+  "source": "spring-petclinic-rest public fixture plus controlled second commit",
+  "upstream_file_sha256": "19291723b9b2f6545595f098116cbf3fd5ee5676aa55ae20f8079b51b5b2d883",
+  "second_change": "blank surname enters all-owner branch",
+  "fixed_source_commits": {
+    "frontend": "d82bd196421b77472af6aeb7f5a439d898af6c37",
+    "backend_first": "b47b2c35b3ecd46e572abf9078b84534a7682cd3",
+    "backend_second": "ad66ebfbe6f90c2d3de8c8c5b63eb9a2d86528bb"
+  },
+  "lexical_baseline": {
+    "retriever_id": "lexical-v1",
+    "top_k": 1,
+    "fields": {
+      "module_id": 6,
+      "topic": 5,
+      "question_variants": 4,
+      "body": 1
+    },
+    "tokenizer": "casefolded ASCII words and Chinese characters/bigrams",
+    "first": {
+      "姓氏筛选": [
+        "ru.business.example.owner.search.ea0b7d7503cf"
+      ],
+      "空白姓氏": [
+        "ru.business.example.owner.search.ea0b7d7503cf"
+      ],
+      "zzunrelatedzz": []
+    },
+    "second": {
+      "姓氏筛选": [
+        "ru.business.example.owner.search.ea0b7d7503cf"
+      ],
+      "空白姓氏": [
+        "ru.business.example.owner.search.ea0b7d7503cf"
+      ],
+      "zzunrelatedzz": []
+    }
+  },
+  "first": {
+    "engine": "SQLite FTS5",
+    "sqlite_version": "3.54.0",
+    "tokenizer": "trigram",
+    "indexed_fields": [
+      "topic",
+      "body"
+    ],
+    "audience": "business",
+    "release_id": "petclinic-public-v1",
+    "top_k": 1,
+    "unit_count": 3,
+    "corpus_sha256": "938954c9953338a4e739ec1565ff8668d48c5c81009f0d6300562f2f6519011e",
+    "queries": [
+      {
+        "query": "姓氏筛选",
+        "ranking": [
+          {
+            "rank": 1,
+            "unit_id": "ru.business.example.owner.search.ea0b7d7503cf",
+            "topic": "主人查询 · 说明",
+            "score": -0.5803351216457385
+          }
+        ]
+      },
+      {
+        "query": "空白姓氏",
+        "ranking": [
+          {
+            "rank": 1,
+            "unit_id": "ru.business.example.owner.search.ea0b7d7503cf",
+            "topic": "主人查询 · 说明",
+            "score": -0.39116598149620113
+          }
+        ]
+      },
+      {
+        "query": "zzunrelatedzz",
+        "ranking": []
+      }
+    ]
+  },
+  "second": {
+    "engine": "SQLite FTS5",
+    "sqlite_version": "3.54.0",
+    "tokenizer": "trigram",
+    "indexed_fields": [
+      "topic",
+      "body"
+    ],
+    "audience": "business",
+    "release_id": "petclinic-public-v2",
+    "top_k": 1,
+    "unit_count": 3,
+    "corpus_sha256": "e7ffe6526f60de7c18fbf4cd76e0b14d603413fad54b65bd35a13f8b5aa2c4f0",
+    "queries": [
+      {
+        "query": "姓氏筛选",
+        "ranking": [
+          {
+            "rank": 1,
+            "unit_id": "ru.business.example.owner.search.ea0b7d7503cf",
+            "topic": "主人查询 · 说明",
+            "score": -0.5795855452734295
+          }
+        ]
+      },
+      {
+        "query": "空白姓氏",
+        "ranking": [
+          {
+            "rank": 1,
+            "unit_id": "ru.business.example.owner.search.ea0b7d7503cf",
+            "topic": "主人查询 · 说明",
+            "score": -0.3904851884243154
+          }
+        ]
+      },
+      {
+        "query": "zzunrelatedzz",
+        "ranking": []
+      }
+    ]
+  }
+}

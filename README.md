@@ -4,7 +4,7 @@
 
 Code2KB Spec 从固定源码提交提取有证据的业务行为与代码逻辑，建立可追溯、可审核、可发布、适合检索的知识库，并提供开放规范、Python 参考实现、AI Agent Skill、模板和技术栈适配器。代码不能单独证明业务政策原因或线上运行结果；未知边界须随知识保留。
 
-> 当前工程版本：`0.7.0`。知识文件协议的兼容标识见[版本管理](docs/versioning.md)，不与任何使用本工具的知识库项目同步编号。
+> 当前工程版本：`0.8.0`。知识文件协议的兼容标识见[版本管理](docs/versioning.md)，不与任何使用本工具的知识库项目同步编号。
 
 ## 三层结构
 
@@ -93,6 +93,10 @@ code2kb check --project-root /path/to/knowledge-project
 
 新知识项目默认使用独立文件协议标识 `c2kb-file/1`；旧 `0.8.3` 项目继续按原规则检查、发布与审计，迁移须显式预演和执行。多语言 Adapter 提供固定源码候选、能力声明与保守的关系线索；候选仍需人工核对后才能写为知识事实。独立的 [Spring PetClinic 公开样本](docs/0.7.0-public-sample-review.md)走通了人工锚点映射、双版发布和检索单元；它不证明自动跨仓库配对或线上运行结果。详见[实施与复核记录](docs/0.7.0-implementation-report.md)。
 
+## 0.8.0 新增能力
+
+可选检索扩展保守保留跨节条件和未知、合并同模块的泛标题，并提供术语表遗漏与整篇保留诊断。新增只读的[全项目源码升级预览](docs/source-upgrade-preview.md)：比较旧、新固定提交，标出证据变化、事实与主题、可定位的检索单元以及无法归属的路径。公开 PetClinic 样本用两个受控提交和实际 SQLite FTS5 跑通改变答案后的定位与召回；结果只证明小样本证据可召回，不代表最终模型回答或线上行为已验证。[检索导入边界](docs/retrieval-contract.md)保持独立快照切换，默认双版发布和知识文件协议不变。
+
 ## 能力边界
 
 本项目能检查结构、固定锚点、摘要、发布隔离和治理记录。它不能自动证明：
@@ -118,7 +122,7 @@ code2kb check --project-root /path/to/knowledge-project
 └── docs/                          # 教程和实现说明
 ```
 
-版本规则见[版本管理](docs/versioning.md)，升级关系见[兼容性说明](docs/compatibility.md)，本版验证结果见[0.7.0 实施与复核记录](docs/0.7.0-implementation-report.md)，后续方向见 [ROADMAP](ROADMAP.md)。
+版本规则见[版本管理](docs/versioning.md)，升级关系见[兼容性说明](docs/compatibility.md)，本版实施边界见[0.8.0 发布规划](docs/0.8.0-implementation-plan.md)，后续方向见 [ROADMAP](ROADMAP.md)。
 
 ## 参与贡献
 
