@@ -1,23 +1,26 @@
 # Code2KB Spec
 
-**简体中文** | [English](README.en.md)
+**简体中文** · [English](README.en.md)
 
-Code2KB Spec 帮助团队从**固定 Git 提交**中提取业务行为与代码逻辑，建立有源码依据、可审核、可发布、便于检索的知识库。它提供 AI Agent Skill、文件规范、模板和 Python 参考工具；AI 负责理解与写作，工具负责检查结构、证据和发布状态。
+从固定源码提交建立**有证据、可审核、可发布**的业务与研发知识库。
 
-> 当前工程版本：`1.0.0`。新知识项目使用 `c2kb-file/1` 文件协议；旧 `0.8.3` 项目仍可检查和审计。[版本说明](docs/versioning.md)
+Code2KB Spec 提供知识文件规范、AI Agent Skill、模板和 Python 参考工具。AI 编码助手负责阅读源码与编写知识；参考工具负责检查文件、证据和发布状态。它适合需要追溯知识来源、维护多仓库应用知识的团队。
 
-## 能做什么
+## 工作流程与产物
 
-- **盘点范围**：登记页面、按钮、接口、消息、定时任务等入口及未覆盖项。
-- **建立知识**：把固定提交中的事实、调用与未知边界写成业务版和研发版，保留证据锚点。
-- **审核发布**：检查影响、复核结论，按授权发布双版知识及版本清单，并审计快照。
-- **按需扩展**：生成检索单元；源码升级时输出[只读复核计划](docs/1.0.0-public-contract.md)，不自动改写或批准知识。
+`固定 Git 提交 → 入口盘点 → 模块取证与写作 → 审核 → 双版发布`
 
-适合维护多仓库应用知识、需要追溯答案来源的团队。它是**知识库生产工具**，不附带业务知识、机器人或在线检索服务。
+| 产物 | 内容 |
+| --- | --- |
+| 知识源 | 功能大纲、模块规格、业务与研发正文、待确认事项 |
+| 发布版本 | 分离的业务版与研发版、版本清单和当前版本指针 |
+| 可选检索扩展 | 按主题组织的检索单元及独立审计信息 |
 
-## 先跑通示例
+源码升级时，1.0.0 还可生成[只读复核计划](docs/1.0.0-public-contract.md)，帮助定位需重新解释的知识；它不会自动改写知识或批准发布。
 
-需要 Git 和 Python 3.9+。克隆仓库后运行内置示例，无需先配置自己的代码：
+## 快速体验
+
+需要 **Git** 和 **Python 3.9+**。内置示例无需准备自己的源码：
 
 ```bash
 git clone https://github.com/Ethereal-Space-one/code2kb-spec.git
@@ -25,46 +28,62 @@ cd code2kb-spec
 python3 -B examples/create_demo.py
 ```
 
-脚本会在临时目录创建一个小型源码仓库和知识项目，执行 `check`，并打印知识项目路径。示例只演示文件结构与检查，不会自动生成完整业务知识。
+命令会在临时目录创建小型源码仓库和知识项目，运行 `check`，并打印项目路径。示例用于体验文件结构与检查流程，不会自动生成完整知识库。
 
-## 接入自己的代码
+## 创建自己的知识项目
 
-1. **建立独立知识项目**。复制配置模板，删去不用的示例仓库，为每个源码仓库填写本机绝对路径和固定提交 SHA：
+### 1. 安装并固定源码版本
 
-   ```bash
-   python3 -m pip install -e .
-   mkdir -p /path/to/knowledge-project
-   cp templates/知识库配置.example.json /path/to/knowledge-project/知识库配置.json
-   git -C /path/to/source-repo rev-parse HEAD
-   ```
+知识项目应与源码仓库分开存放。从模板创建配置：
 
-2. **先盘点，再逐模块取证**。让 AI 编码助手读取 [Skill](skills/extract-app-knowledge/SKILL.md)，从范围盘点开始；核对配置中的固定提交，生成 `知识源/功能大纲.md`，再按模块写规格、业务正文和研发正文。可直接给助手：
+```bash
+python3 -m pip install -e .
+mkdir -p /path/to/knowledge-project
+git init /path/to/knowledge-project
+cp templates/知识库配置.example.json /path/to/knowledge-project/知识库配置.json
+git -C /path/to/source-repo rev-parse HEAD
+```
 
-   ```text
-   请读取 <code2kb-spec-root>/skills/extract-app-knowledge/SKILL.md。
-   知识项目是 /path/to/knowledge-project。先核对配置中的固定源码提交，
-   盘点全范围入口并生成知识源/功能大纲.md；未知项明确登记，不推断线上运行结果。
-   ```
+编辑 `知识库配置.json`：删去不用的示例仓库，将每个 `repositories` 条目的 `path` 改为本机源码仓库绝对路径，`commit` 改为对应的固定提交 SHA。
 
-3. **检查与发布**。每个模块依次处理影响复核、结论复核、候选准备和授权审核；全部通过后发布并审计：
+### 2. 盘点入口并编写知识
 
-   ```bash
-   code2kb check --project-root /path/to/knowledge-project
-   code2kb publish --project-root /path/to/knowledge-project --release-id my-kb-v1
-   code2kb audit-release --project-root /path/to/knowledge-project
-   ```
+让 AI 编码助手读取 [Skill](skills/extract-app-knowledge/SKILL.md)。先核对配置与固定提交，建立 `知识源/功能大纲.md`；再按模块取证、写业务与研发正文。例如：
 
-   `publish` 需要已审核的模块包，不能在刚复制模板后直接运行。具体审核命令与参数见[使用指南](docs/usage.md)；工具不会替你判断业务政策或给予发布授权。
+```text
+请读取 <code2kb-spec-root>/skills/extract-app-knowledge/SKILL.md。
+知识项目是 /path/to/knowledge-project。先核对配置中的固定源码提交，
+盘点全范围入口并生成知识源/功能大纲.md；明确登记未知项，
+不要把源码推断写成线上运行结果。
+```
 
-## 从哪里继续
+### 3. 检查、审核与发布
 
-| 需求 | 文档 |
-| --- | --- |
-| 完整操作与命令 | [使用指南](docs/usage.md) |
-| 文件、证据和发布规则 | [规范](SPEC.md) |
-| 可选检索单元与评测 | [检索契约](docs/retrieval-contract.md) · [评测手顺](docs/retrieval-evaluation.md) |
-| 版本变化与兼容性 | [变更记录](CHANGELOG.md) · [兼容说明](docs/compatibility.md) |
+知识源写入后，可随时运行结构检查：
 
-**边界**：源码不能单独证明线上部署、运行效果或业务政策；缺少运行证据时保留 `source_only` 与待确认项。检索命中只是候选证据，不等于最终回答已核实。
+```bash
+code2kb check --project-root /path/to/knowledge-project
+```
 
-欢迎阅读 [贡献指南](CONTRIBUTING.md)；本项目采用 [Apache License 2.0](LICENSE)。
+按模块完成影响复核、结论复核、候选准备及授权审核后，再发布并审计：
+
+```bash
+code2kb publish --project-root /path/to/knowledge-project --release-id my-kb-v1
+code2kb audit-release --project-root /path/to/knowledge-project
+```
+
+`check` 通过不等于知识已可发布。`impact`、`confirm-claims`、`prepare` 和审核命令的参数见[使用指南](docs/usage.md)。
+
+## 文档与支持
+
+- [使用指南](docs/usage.md)：完整操作手顺与命令
+- [规范](SPEC.md)：文件、证据、审核与发布要求
+- [检索扩展](docs/retrieval-contract.md)：可选检索单元与外部索引边界
+- [版本与兼容性](docs/versioning.md)：工程版本、知识文件协议和项目发布版本
+- [问题反馈](https://github.com/Ethereal-Space-one/code2kb-spec/issues) · [贡献指南](CONTRIBUTING.md) · [变更记录](CHANGELOG.md)
+
+## 使用边界
+
+源码不能单独证明线上运行、业务政策或授权结果；缺少运行证据时须保留未知项。项目不包含业务知识、机器人部署或在线检索服务。
+
+当前工程版本：`1.0.0`。新项目默认文件协议为 `c2kb-file/1`；旧 `0.8.3` 项目仍受支持。本项目采用 [Apache License 2.0](LICENSE)。
