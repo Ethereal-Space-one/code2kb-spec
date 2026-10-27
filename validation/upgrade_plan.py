@@ -37,7 +37,9 @@ def _git_baseline(project: Path) -> tuple[str | None, bool]:
                           text=True, capture_output=True)
     if head.returncode:
         return None, True
-    state = subprocess.run(["git", "-C", str(project), "status", "--porcelain", "--untracked-files=all"],
+    # A plain status may refresh .git/index even when tracked contents are unchanged.
+    state = subprocess.run(["git", "--no-optional-locks", "-C", str(project),
+                            "status", "--porcelain", "--untracked-files=all"],
                            text=True, capture_output=True)
     return head.stdout.strip(), bool(state.returncode or state.stdout)
 

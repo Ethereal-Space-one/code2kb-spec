@@ -187,6 +187,22 @@ class KnowledgeTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("业务文件含源码仓库链接", result.stderr)
 
+    def test_business_source_rejects_private_branch_url_on_check_and_publish(self):
+        overview = self.module / "模块概览.md"
+        write(overview, overview.read_text(encoding="utf-8") + "\n[参考](https://git.example.com/team/repo/blob/main/src/file.py)\n")
+        for action in ("check", "publish"):
+            with self.subTest(action=action):
+                result = self.run_cli(action, *(["--release-id", "private-branch"] if action == "publish" else []))
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("业务文件含源码仓库链接", result.stderr)
+
+    def test_business_source_rejects_character_reference_in_repository_url(self):
+        overview = self.module / "模块概览.md"
+        write(overview, overview.read_text(encoding="utf-8") + "\n[参考](https://github.com/example&#47;repo)\n")
+        result = self.run_cli("check")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("业务文件含源码仓库链接", result.stderr)
+
     def test_business_source_allows_ordinary_web_url(self):
         overview = self.module / "模块概览.md"
         write(overview, overview.read_text(encoding="utf-8") + "\n[帮助](https://example.invalid/help/orders)\n")

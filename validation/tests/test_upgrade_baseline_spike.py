@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -16,9 +17,28 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / 'validation/tests'))
 import test_knowledge as fixture
 from validation.evidence_snapshot import snapshot
-from validation.upgrade_plan import _migration_scope, _scope_metrics
+from validation.upgrade_plan import _git_baseline, _migration_scope, _scope_metrics
 
 class UpgradeBaselineSpikeTests(unittest.TestCase):
+    def test_read_only_baseline_does_not_refresh_git_index(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            project = Path(temporary)
+            fixture.init_fixture_repo(project)
+            tracked = project / 'tracked.txt'
+            tracked.write_text('unchanged\n', encoding='utf-8')
+            subprocess.run(['git', '-C', str(project), 'add', '.'], check=True)
+            subprocess.run(['git', '-C', str(project), '-c', 'user.name=Fixture',
+                            '-c', 'user.email=fixture@example.invalid', 'commit', '-q', '-m', 'base'], check=True)
+            index = project / '.git/index'
+            original = index.read_bytes()
+            stat = tracked.stat()
+            os.utime(tracked, ns=(stat.st_atime_ns, stat.st_mtime_ns + 10_000_000_000))
+            head, dirty = _git_baseline(project)
+            self.assertEqual(head, subprocess.check_output(['git', '-C', str(project), 'rev-parse', 'HEAD'],
+                                                            text=True).strip())
+            self.assertFalse(dirty)
+            self.assertEqual(index.read_bytes(), original)
+
     def test_other_repository_module_is_not_counted_as_migration_work(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             project = Path(temporary)
@@ -121,6 +141,11 @@ class UpgradeBaselineSpikeTests(unittest.TestCase):
             self.assertEqual(published.returncode, 0, published.stderr)
             subprocess.run(['git','-C',str(project),'add','.'],check=True)
             subprocess.run(['git','-C',str(project),'-c','user.name=Fixture','-c','user.email=fixture@example.invalid','commit','-q','-m','base release'],check=True)
+            project_index = project / '.git/index'
+            index_before_preview = project_index.read_bytes()
+            config_path = project / '知识库配置.json'
+            config_stat = config_path.stat()
+            os.utime(config_path, ns=(config_stat.st_atime_ns, config_stat.st_mtime_ns + 10_000_000_000))
 
             shutil.copy2(ROOT/'conformance/upgrade-two-module/revision-2/src/main/java/example/OrderRule.java',destination/'OrderRule.java')
             subprocess.run(['git','-C',str(backend),'add','.'],check=True)
@@ -128,6 +153,7 @@ class UpgradeBaselineSpikeTests(unittest.TestCase):
             new = subprocess.check_output(['git','-C',str(backend),'rev-parse','HEAD'],text=True).strip()
             plan = sample.run_cli('preview-upgrade','--all-modules','--plan','--repository-id','backend','--new-commit',new)
             self.assertEqual(plan.returncode, 0, plan.stderr)
+            self.assertEqual(project_index.read_bytes(), index_before_preview)
             candidate = json.loads(plan.stdout)
             self.assertEqual(candidate['decision'], 'selected_modules')
             self.assertEqual(candidate['selected_modules'], ['sample.order.delivery'])

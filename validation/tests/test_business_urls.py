@@ -14,6 +14,11 @@ class BusinessSourceUrlTests(unittest.TestCase):
             "[参考](https://github.com/example/repo/blob/abc1234/README.md#L3)",
             "https://gitlab.com/example/repo/-/blob/abc1234/README.md",
             "https://code.example.invalid/example/repo/commit/abc1234",
+            "https://git.example.com/team/repo/blob/main/src/file.py",
+            "https://git.example.com/team/repo/-/tree/master/src",
+            "https://git.example.com/team/repo/blob/v1.2.0/README.md",
+            "[参考](https://github.com/example&#47;repo)",
+            "[参考](https://git&#46;example.com/team/repo)",
             "HTTPS://GITHUB.COM/EXAMPLE/REPO",
         ):
             with self.subTest(text=text):
@@ -25,6 +30,8 @@ class BusinessSourceUrlTests(unittest.TestCase):
             "https://github.com/features",
             "[规则说明](https://example.invalid/rules#section-2)",
             "https://news.example.invalid/article/2026/10/26",
+            "https://example.invalid/help/orders/tree",
+            "https://example.com/catalog/plants/tree/oak",
         ):
             with self.subTest(text=text):
                 self.assertFalse(contains_source_repository_url(text))

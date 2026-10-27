@@ -522,6 +522,8 @@ class GovernanceTests(unittest.TestCase):
         from governance import scan_business_terms
         with self.assertRaisesRegex(ValueError, "源码仓库链接"):
             scan_business_terms(core, "[参考](https://github.com/example/repo/blob/abc1234/README.md#L3)", "目录.md")
+        with self.assertRaisesRegex(ValueError, "源码仓库链接"):
+            scan_business_terms(core, "[参考](https://github.com/example&#47;repo)", "目录.md")
         scan_business_terms(core, "[帮助](https://example.invalid/help/orders)", "目录.md")
         with self.assertRaisesRegex(ValueError, "禁用表述"):
             scan_business_terms(core, "METHOD-001", "旧目录.md", source_urls=False)

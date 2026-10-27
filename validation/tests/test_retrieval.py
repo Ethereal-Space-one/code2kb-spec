@@ -53,7 +53,7 @@ class RetrievalTests(unittest.TestCase):
         release = self.project / "发布"
         local = "订单/订单查询/模块概览.md"
         overview = release / "业务版" / local
-        fixtures.write(overview, overview.read_text(encoding="utf-8") + "\n[参考](https://github.com/example/repo/blob/abc1234/README.md#L3)\n")
+        fixtures.write(overview, overview.read_text(encoding="utf-8") + "\n[参考](https://git.example.com/team/repo/blob/main/README.md)\n")
         registry_path = release / "版本清单/retrieval-test.json"
         registry = json.loads(registry_path.read_text(encoding="utf-8"))
         registry["views"]["business"]["files"][local] = core.digest(overview.read_bytes())
