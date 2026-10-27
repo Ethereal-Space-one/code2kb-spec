@@ -374,6 +374,22 @@ class RelationGovernanceTests(unittest.TestCase):
         self.assertEqual(planned.returncode, 0, planned.stderr)
         plan = json.loads(planned.stdout)
         self.assertEqual(plan["schema_version"], "1.0")
+        self.assertEqual(plan["kind"], "source_upgrade_review_plan")
+        self.assertTrue({"repository_id", "old_commit", "proposed_commit", "decision",
+                         "selected_modules", "fallback_reasons", "input_snapshot",
+                         "review_scope_metrics", "execution_gate", "plan_sha256"} <= set(plan))
+        self.assertRegex(plan["plan_sha256"], r"^[0-9a-f]{64}$")
+        self.assertEqual(plan["selected_modules"], sorted(set(plan["selected_modules"])))
+        self.assertIsInstance(plan["input_snapshot"]["knowledge_worktree_dirty"], bool)
+        self.assertRegex(plan["input_snapshot"]["knowledge_git_head"], r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
+        for key in ("config_sha256", "source_tree_sha256", "relations_sha256",
+                    "approval_manifests_sha256", "runtime_evidence_tree_sha256"):
+            self.assertRegex(plan["input_snapshot"][key], r"^[0-9a-f]{64}$")
+        for key in ("modules_total", "semantic_review_modules", "baseline_touch_modules",
+                    "approval_refresh_modules"):
+            value = plan["review_scope_metrics"][key]
+            self.assertIs(type(value), int)
+            self.assertGreaterEqual(value, 0)
         self.assertEqual(plan["decision"], "selected_modules")
         self.assertEqual(plan["selected_modules"], ["example.order.query"])
         self.assertEqual(plan["execution_gate"], "baseline_migration_and_explicit_review_required")
