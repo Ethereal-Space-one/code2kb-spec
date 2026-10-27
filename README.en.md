@@ -2,6 +2,8 @@
 
 [简体中文](README.md) · **English**
 
+![Code2KB Spec: from pinned source revisions to reviewable knowledge](assets/readme/overview.svg)
+
 Build **evidence-backed, reviewable, publishable** business and engineering knowledge bases from pinned source revisions.
 
 Code2KB Spec provides a knowledge-file specification, an AI agent skill, templates, and Python reference tools. A coding agent reads source code and writes knowledge; the tools check files, evidence, and release state. It is intended for teams that need traceable knowledge across code repositories.
@@ -17,6 +19,17 @@ Code2KB Spec provides a knowledge-file specification, an AI agent skill, templat
 | Optional retrieval extension | Topic-sized retrieval units with an independent audit record |
 
 For source upgrades, 1.0.0 can also produce a [read-only review plan](docs/1.0.0-public-contract.md) to locate knowledge that may need reinterpretation. It does not rewrite knowledge or approve releases.
+
+<details>
+<summary>View the evidence and two-view release diagrams</summary>
+
+These diagrams use illustrative code and fact IDs; their examples are not project output. The diagrams have Chinese labels with English subtitles.
+
+![Trace a structured fact back to a pinned source anchor](assets/readme/evidence.svg)
+
+![Publish shared business knowledge in separate business and engineering views](assets/readme/two-views.svg)
+
+</details>
 
 ## Quick start
 
