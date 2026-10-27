@@ -536,30 +536,29 @@ class GovernanceTests(unittest.TestCase):
         self.assertEqual(json.loads(result.stdout)["generated_by"]["version"], "0.8.0")
 
     def test_audit_source_url_rule_follows_generator_version(self):
-        self.assertEqual(self.publish("url-policy-v1").returncode, 0)
-        release = self.project / "发布"
-        local = "订单/订单查询/模块概览.md"
-        for audience in ("业务版", "研发版"):
-            path = release / audience / local
-            write(path, path.read_text(encoding="utf-8") + "\n[参考](https://github.com/example/repo/blob/abc1234/README.md#L3)\n")
-        registry_path = release / "版本清单/url-policy-v1.json"
-        registry = json.loads(registry_path.read_text(encoding="utf-8"))
-        for audience, view in (("business", "业务版"), ("engineering", "研发版")):
-            registry["views"][audience]["files"][local] = core.digest((release / view / local).read_bytes())
-        write(registry_path, json.dumps(registry, ensure_ascii=False, indent=2) + "\n")
-        pointer_path = release / "当前版本.json"
-        pointer = json.loads(pointer_path.read_text(encoding="utf-8"))
-        pointer["registry_sha256"] = core.digest(registry_path.read_bytes())
-        write(pointer_path, json.dumps(pointer, ensure_ascii=False, indent=2) + "\n")
-        legacy_audit = self.run_cli("audit-release")
+        # Start from a genuine frozen 0.8 release. A new 1.0 publish must not
+        # be relabeled as 0.8 merely to test the historical audit rule.
+        frozen = Path(__file__).resolve().parents[2] / "conformance/legacy-url-release"
+        candidate = self.root / "legacy-url-audit-copy"
+        shutil.copytree(frozen, candidate)
+        release = candidate / "发布"
+        legacy_audit = subprocess.run(
+            [fixture.sys.executable, str(fixture.SCRIPT), "audit-release", "--project-root", str(candidate)],
+            text=True, capture_output=True)
         self.assertEqual(legacy_audit.returncode, 0, legacy_audit.stderr)
 
+        registry_path = release / "版本清单/v08-source-url.json"
+        registry = json.loads(registry_path.read_text(encoding="utf-8"))
+        pointer_path = release / "当前版本.json"
+        pointer = json.loads(pointer_path.read_text(encoding="utf-8"))
         registry["generated_by"]["version"] = "1.0.0"
         pointer["generated_by"]["version"] = "1.0.0"
         write(registry_path, json.dumps(registry, ensure_ascii=False, indent=2) + "\n")
         pointer["registry_sha256"] = core.digest(registry_path.read_bytes())
         write(pointer_path, json.dumps(pointer, ensure_ascii=False, indent=2) + "\n")
-        current_audit = self.run_cli("audit-release")
+        current_audit = subprocess.run(
+            [fixture.sys.executable, str(fixture.SCRIPT), "audit-release", "--project-root", str(candidate)],
+            text=True, capture_output=True)
         self.assertNotEqual(current_audit.returncode, 0)
         self.assertIn("源码仓库链接", current_audit.stderr)
 
