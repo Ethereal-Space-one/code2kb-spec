@@ -2,80 +2,70 @@
 
 [简体中文](README.md) | **English**
 
-Code2KB Spec extracts evidence-backed business behavior and code logic from fixed source revisions into traceable, reviewable, publishable, and retrievable knowledge bases. The repository also provides a Python reference implementation, an AI agent skill, templates, and stack adapters. Source code alone cannot prove business-policy intent or live behavior; uncertainty remains part of the knowledge.
+Code2KB Spec helps teams turn **pinned Git revisions** into evidence-backed knowledge of business behavior and code logic. It provides an AI agent skill, file specification, templates, and Python reference tools. The agent reads and writes knowledge; the tools check structure, evidence, and release state.
 
-> Current project version: `1.0.0`. The knowledge file protocol has its own compatibility identifier; it does not follow the version of any project using this tool.
+> Current project version: `1.0.0`. New knowledge projects use the `c2kb-file/1` file protocol; existing `0.8.3` projects remain checkable and auditable. [Versioning](docs/versioning.md)
 
-## Three layers
+## What it does
 
-| Layer | Purpose | Entry point |
-| --- | --- | --- |
-| Code2KB Spec | File, evidence, review, and release contracts | [SPEC.md](SPEC.md) |
-| Reference Implementation | Python validation, review, publishing, and audit tools | [Reference implementation](docs/reference-implementation.md) |
-| Agent Toolkit | Skill, prompts, templates, and adapters | [AI Skill](skills/extract-app-knowledge/SKILL.md) |
+- **Inventory scope:** record pages, actions, APIs, messages, scheduled jobs, and coverage gaps.
+- **Build knowledge:** write business and engineering views from pinned code, with source anchors and explicit unknowns.
+- **Review and release:** check impacts and claims, publish authorized views with a version manifest, then audit the snapshot.
+- **Extend when needed:** build retrieval units or produce a [read-only source-upgrade review plan](docs/1.0.0-public-contract.md). The plan does not rewrite or approve knowledge.
 
-The normative specification is currently written in Simplified Chinese. If a translation differs from the Chinese specification, the Chinese text controls.
+This is a **knowledge-base production toolkit** for teams that need traceable answers across code repositories. It does not ship a domain knowledge base, bot, or hosted search service.
 
-## Quick start
+## Try the demo
+
+Requires Git and Python 3.9+. The bundled demo needs no project configuration:
 
 ```bash
 git clone https://github.com/Ethereal-Space-one/code2kb-spec.git
 cd code2kb-spec
-python3 -B -m unittest discover -s validation/tests -q
-python3 -B scripts/check_conformance.py --check-expected
-python3 -m pip install -e .
-code2kb --help
-code2kb --version
+python3 -B examples/create_demo.py
 ```
 
-Create a configuration from the template and point it to fixed Git commits:
+The script creates a small source repository and knowledge project in a temporary directory, runs `check`, and prints the project path. It demonstrates the structure and validator; it does not generate a complete business knowledge base.
 
-```bash
-cp templates/知识库配置.example.json /path/to/knowledge-project/知识库配置.json
-code2kb check --project-root /path/to/knowledge-project
-```
+## Use your own code
 
-See the [Chinese README](README.md) and [usage guide](docs/usage.md) for the complete workflow.
+1. **Create a separate knowledge project.** Copy the configuration template, remove unused example repositories, and set each repository's absolute local path and pinned commit SHA:
 
-## 0.4.0 highlights
+   ```bash
+   python3 -m pip install -e .
+   mkdir -p /path/to/knowledge-project
+   cp templates/知识库配置.example.json /path/to/knowledge-project/知识库配置.json
+   git -C /path/to/source-repo rev-parse HEAD
+   ```
 
-- optional topic-sized Markdown retrieval units, separated by audience and bound to an audited base release;
-- an independent retrieval manifest, routing index, evaluation gate, and tamper audit;
-- read-only lookup of candidate evidence and source paths from the audited current retrieval release;
-- an offline lexical baseline and a strict external-results import format;
-- a compact authoring profile and a full-versus-compact topic comparison;
-- task-scoped Agent Skill contracts with optional extensions.
+2. **Inventory before extraction.** Ask your coding agent to read the [Skill](skills/extract-app-knowledge/SKILL.md), verify the pinned commits, create `知识源/功能大纲.md`, then extract and write each module. A starting prompt:
 
-See the [retrieval contract](docs/retrieval-contract.md) and [evaluation guide](docs/retrieval-evaluation.md). The default two-view release remains unchanged.
+   ```text
+   Read <code2kb-spec-root>/skills/extract-app-knowledge/SKILL.md.
+   The knowledge project is /path/to/knowledge-project. Verify its pinned source commits,
+   inventory all in-scope entry points, and create 知识源/功能大纲.md.
+   Record unknowns explicitly; do not infer production behavior from source alone.
+   ```
 
-## What's new in 0.5.0
+3. **Check, review, and release.** Resolve module impact and claim reviews, prepare candidate packages, and obtain approval before publishing:
 
-The optional [relation and evidence extension](docs/relation-contract.md) adds fixed-commit excerpt rebuilding, reviewed fact-to-topic links, coverage reports, and conservative TypeScript/Java candidates. Candidates do not become business facts automatically. See the [implementation plan](docs/0.5.0-implementation-plan.md) and [independent public evidence check](docs/0.5.0-public-evidence-check.md) for scope and validation limits.
+   ```bash
+   code2kb check --project-root /path/to/knowledge-project
+   code2kb publish --project-root /path/to/knowledge-project --release-id my-kb-v1
+   code2kb audit-release --project-root /path/to/knowledge-project
+   ```
 
-## What's new in 0.6.0
+   `publish` requires reviewed module packages; it will not work immediately after copying the template. See the [usage guide](docs/usage.md) for review commands and arguments. The tool does not decide business policy or grant release approval.
 
-The optional [local resumable runner](docs/0.6.0-runner.md) adds a durable task ledger, project locking, crash recovery, batch checkpoints, and thin Claude Code and Codex adapters. The ledger does not grant approval. Existing projects need not enable it or republish for this change. See [versioning](docs/versioning.md) for file-format compatibility and the [implementation plan](docs/0.6.0-implementation-plan.md) for scope.
+## Documentation
 
-## What's new in 0.7.0
+| Need | Read |
+| --- | --- |
+| Full workflow and commands | [Usage guide](docs/usage.md) |
+| File, evidence, and release rules | [Specification](SPEC.md) |
+| Optional retrieval units and evaluation | [Retrieval contract](docs/retrieval-contract.md) · [Evaluation guide](docs/retrieval-evaluation.md) |
+| Changes and compatibility | [Changelog](CHANGELOG.md) · [Compatibility](docs/compatibility.md) |
 
-New projects default to the independent `c2kb-file/1` file protocol identifier. Existing `0.8.3` projects retain their validation, publishing, and audit path; migration requires an explicit preview and apply step. Multilanguage adapters emit fixed-revision candidates, capability declarations, and conservative relationship clues. Candidates still need human evidence review before becoming knowledge facts. An independent [Spring PetClinic public sample](docs/0.7.0-public-sample-review.md) exercises manually anchored facts through both published views and retrieval units; it does not establish automatic cross-repository pairing or live behavior. See the [implementation and review record](docs/0.7.0-implementation-report.md).
+**Limits:** source code alone cannot prove deployment, runtime behavior, or business policy. Without runtime evidence, retain `source_only` and unresolved questions. A retrieval hit is candidate evidence, not a verified final answer.
 
-## What's new in 0.8.0
-
-The optional retrieval view conservatively retains conditions and unknowns that span sections, merges generic headings within a module, and reports omitted glossaries and whole-source units needing review. A read-only [project-wide source-upgrade preview](docs/source-upgrade-preview.md) compares fixed Git commits and locates changed evidence, facts, topics, available retrieval units, and unattributed paths. A controlled two-commit PetClinic sample runs actual SQLite FTS5 over generated units; it establishes narrow retrieval evidence, not final model-answer or production correctness. The [retrieval import contract](docs/retrieval-contract.md) describes staged snapshot replacement. Default two-view publishing and the knowledge file protocol remain unchanged.
-
-## What's new in 1.0.0
-
-`preview-upgrade --all-modules --plan` produces a [read-only review plan](docs/1.0.0-public-contract.md) bound to its inputs. It separates modules needing semantic review from modules whose source baseline and approvals must be refreshed. Stale or insufficiently covered plans fail or fall back to full-project review. The plan does not migrate evidence, create tasks, approve, or publish. In a five-module public sample, one module needs semantic reinterpretation while all five still need baseline and approval work; no net automation benefit is claimed. New business releases reject clear source-repository URLs, while historical releases remain auditable under their original rule.
-
-## Boundaries
-
-Code2KB validates deterministic structure, fixed source anchors, digests, audience separation, and governance records. It does not prove natural-language correctness, production behavior, business policy, authorization decisions, external report truth, or reviewer identity.
-
-The project contains no company-specific knowledge, bot deployment, vector database, or production credentials.
-
-## Contributing and license
-
-Read [CONTRIBUTING.md](CONTRIBUTING.md) and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) before contributing. Report security issues through [SECURITY.md](SECURITY.md).
-
-Licensed under the [Apache License 2.0](LICENSE).
+The normative specification is in Simplified Chinese; it controls if a translation differs. Contributions are welcome under the [contribution guide](CONTRIBUTING.md). Licensed under [Apache 2.0](LICENSE).

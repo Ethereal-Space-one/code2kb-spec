@@ -1,6 +1,6 @@
 # Code2KB Spec 使用指南
 
-> 已发布工程基线 `0.6.0`；0.7 候选中新项目默认 `c2kb-file/1`，旧项目继续支持 `0.8.3`。AI 的执行入口是 [`skills/extract-app-knowledge/SKILL.md`](../skills/extract-app-knowledge/SKILL.md)。
+> 适用于工程 `1.0.0`：新项目默认 `c2kb-file/1`，旧 `0.8.3` 项目继续受支持。AI 的执行入口是 [`skills/extract-app-knowledge/SKILL.md`](../skills/extract-app-knowledge/SKILL.md)。
 
 ## 工作方式
 
