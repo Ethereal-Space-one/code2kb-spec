@@ -20,18 +20,20 @@ import tempfile
 from urllib.parse import unquote
 
 try:
+    from .business_urls import contains_source_repository_url
     from .adapters.ts_java import scan as scan_candidates
     from .adapters import ADAPTER_NAMES, get_adapter
     from .evidence_snapshot import snapshot as source_snapshot
     from .governance import Governance, json_text, atomic_write, digest, scan_business_terms
-    from . import retrieval_build, retrieval_evaluate, retrieval_audit, retrieval_profile, retrieval_query, relation_release, relation_model, relation_upgrade, relation_upgrade_project, fact_render, run_state, workflow, host_adapter, protocol, protocol_migration
+    from . import retrieval_build, retrieval_evaluate, retrieval_audit, retrieval_profile, retrieval_query, relation_release, relation_model, relation_upgrade, relation_upgrade_project, fact_render, run_state, workflow, host_adapter, protocol, protocol_migration, upgrade_plan
     from .retrieval_model import strict_json as retrieval_json
 except ImportError:  # 兼容直接执行 validation/knowledge.py
+    from business_urls import contains_source_repository_url
     from adapters.ts_java import scan as scan_candidates
     from adapters import ADAPTER_NAMES, get_adapter
     from evidence_snapshot import snapshot as source_snapshot
     from governance import Governance, json_text, atomic_write, digest, scan_business_terms
-    import retrieval_build, retrieval_evaluate, retrieval_audit, retrieval_profile, retrieval_query, relation_release, relation_model, relation_upgrade, relation_upgrade_project, fact_render, run_state, workflow, host_adapter, protocol, protocol_migration
+    import retrieval_build, retrieval_evaluate, retrieval_audit, retrieval_profile, retrieval_query, relation_release, relation_model, relation_upgrade, relation_upgrade_project, fact_render, run_state, workflow, host_adapter, protocol, protocol_migration, upgrade_plan
     from retrieval_model import strict_json as retrieval_json
 
 
@@ -393,6 +395,8 @@ def read_documents(source: Path) -> tuple[list[Document], Outline]:
             except ValueError as exc:
                 raise KnowledgeError(f"{relative}: reviewed_at 须为 YYYY-MM-DD") from exc
         if expected in BUSINESS:
+            if contains_source_repository_url(body):
+                raise KnowledgeError(f"{relative}: 业务文件含源码仓库链接；请移至研发专属内容")
             if set(meta) - BUSINESS_METADATA or TECHNICAL.search(body) or BUSINESS_FORBIDDEN.search(body):
                 raise KnowledgeError(f"{relative}: 业务文件含明显技术内容或过程用语；请移至技术实现或过程文件")
         if expected in ENGINEERING and meta["review_status"] in {"reviewed", "policy_reviewed"}:
@@ -1044,7 +1048,7 @@ def publish_boundary(config: dict, engineering: bool, outline: Outline,
     return lines + notes
 
 
-def validate_bundle(root: Path, engineering: bool) -> None:
+def validate_bundle(root: Path, engineering: bool, *, source_urls: bool = True) -> None:
     """Check the actual reader-visible tree, including generated navigation."""
     root = root.resolve(strict=True)
     for path in root.rglob("*.md"):
@@ -1065,7 +1069,7 @@ def validate_bundle(root: Path, engineering: bool) -> None:
         if plain:
             raise KnowledgeError(f"发布物有未链接的文件引用：{relative} → {plain.group(0)}")
         if not engineering:
-            scan_business_terms(sys.modules[__name__], body, relative.as_posix())
+            scan_business_terms(sys.modules[__name__], body, relative.as_posix(), source_urls=source_urls)
         for target in LINK.findall(body):
             if target.startswith(("http://", "https://", "mailto:")) or target.startswith("#"):
                 continue
@@ -1166,6 +1170,8 @@ def _main() -> int:
             preview_scope = sub.add_mutually_exclusive_group(required=True)
             preview_scope.add_argument("--module-id")
             preview_scope.add_argument("--all-modules", action="store_true")
+            sub.add_argument("--plan", action="store_true", help="全项目模式下输出绑定输入摘要的只读复核候选计划")
+            sub.add_argument("--expect-plan-sha256", help="复算候选计划并核对先前保存的摘要；不接受过期输入")
             sub.add_argument("--repository-id", required=True)
             sub.add_argument("--new-commit", required=True)
             sub.add_argument("--exclude-path", action="append", default=[], metavar="PATH=REASON",
@@ -1302,10 +1308,22 @@ def _main() -> int:
                     {module_id: {**item["data"], "links": item["links"]} for module_id, item in preview_governance.relations.items()},
                     facts, preview_outline.entries, preview_config["repositories"],
                     args.repository_id, args.new_commit, topic_units, exclusions)
-                print(json_text(result))
+                if args.expect_plan_sha256 is not None and not args.plan:
+                    raise KnowledgeError("--expect-plan-sha256 仅支持 --plan")
+                planned = (upgrade_plan.build(project, preview_source, result, preview_docs,
+                                              preview_governance.relations,
+                                              list(preview_outline.modules), parse_frontmatter) if args.plan else result)
+                if args.expect_plan_sha256 is not None and (not re.fullmatch(r"[0-9a-f]{64}", args.expect_plan_sha256)
+                                                            or planned["plan_sha256"] != args.expect_plan_sha256):
+                    raise KnowledgeError("升级候选计划已过期；重新生成并核对输入后再继续")
+                print(json_text(planned))
                 return 0
             if args.exclude_path:
                 raise KnowledgeError("--exclude-path 仅支持全项目模式")
+            if args.plan:
+                raise KnowledgeError("--plan 仅支持全项目模式")
+            if args.expect_plan_sha256 is not None:
+                raise KnowledgeError("--expect-plan-sha256 仅支持全项目 --plan")
             preview_spec = next((doc for doc in preview_docs if doc.doc_type == "spec" and doc.module_id == args.module_id), None)
             if preview_spec is None:
                 raise KnowledgeError("升级预览模块没有结构化规格")

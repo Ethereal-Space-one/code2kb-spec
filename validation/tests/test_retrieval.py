@@ -48,6 +48,25 @@ class RetrievalTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         return self.project / "发布"
 
+    def test_business_unit_build_rejects_source_repository_url(self):
+        self.publish()
+        release = self.project / "发布"
+        local = "订单/订单查询/模块概览.md"
+        overview = release / "业务版" / local
+        fixtures.write(overview, overview.read_text(encoding="utf-8") + "\n[参考](https://git.example.com/team/repo/blob/main/README.md)\n")
+        registry_path = release / "版本清单/retrieval-test.json"
+        registry = json.loads(registry_path.read_text(encoding="utf-8"))
+        registry["views"]["business"]["files"][local] = core.digest(overview.read_bytes())
+        fixtures.write(registry_path, json.dumps(registry, ensure_ascii=False, indent=2) + "\n")
+        pointer_path = release / "当前版本.json"
+        pointer = json.loads(pointer_path.read_text(encoding="utf-8"))
+        pointer["registry_sha256"] = core.digest(registry_path.read_bytes())
+        fixtures.write(pointer_path, json.dumps(pointer, ensure_ascii=False, indent=2) + "\n")
+        result = self.fixture.run_cli("retrieval-build", "--release-id", "retrieval-test")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("源码仓库链接", result.stderr)
+        self.assertFalse((release / "检索版").exists())
+
     def test_build_is_deterministic_and_requires_evaluation(self):
         self.publish()
         self.assertFalse((self.project / "发布/检索版").exists())

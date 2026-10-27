@@ -1,0 +1,14 @@
+{
+  "standard_version": "c2kb-file/1",
+  "release_id": "v08-source-url",
+  "business_path": "发布/业务版",
+  "engineering_path": "发布/研发版",
+  "document_commit": "67b1ae8a0290b089c5482c78e46f1e9c216d1937",
+  "registry_path": "发布/版本清单/v08-source-url.json",
+  "registry_sha256": "0efe82ab2402d6161ca8a6540c9a45a4df296e5743cfc7e71d7b46fb8a8b80f6",
+  "history_backend": "git",
+  "generated_by": {
+    "name": "Code2KB Spec",
+    "version": "0.8.0"
+  }
+}

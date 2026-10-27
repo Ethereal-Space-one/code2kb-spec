@@ -361,6 +361,77 @@ class RelationGovernanceTests(unittest.TestCase):
         self.assertEqual(json.loads(legacy.stdout)["schema_version"], "0.1")
         self.assertEqual((self.example.project / "知识库配置.json").read_bytes(), old_config)
 
+        dirty = self.example.run_cli("preview-upgrade", "--all-modules", "--plan", *args)
+        self.assertEqual(dirty.returncode, 0, dirty.stderr)
+        self.assertEqual(json.loads(dirty.stdout)["decision"], "full_project_review")
+        self.assertIn("knowledge_worktree_dirty", json.loads(dirty.stdout)["fallback_reasons"])
+        self.assertTrue(all(row["semantic_review_required"] for row in
+                            json.loads(dirty.stdout)["baseline_migration"]["modules"]))
+        subprocess.run(["git", "-C", str(self.example.project), "add", "知识源"], check=True)
+        subprocess.run(["git", "-C", str(self.example.project), "-c", "user.name=Fixture",
+                        "-c", "user.email=fixture@example.invalid", "commit", "-q", "-m", "record mapping"], check=True)
+        planned = self.example.run_cli("preview-upgrade", "--all-modules", "--plan", *args)
+        self.assertEqual(planned.returncode, 0, planned.stderr)
+        plan = json.loads(planned.stdout)
+        self.assertEqual(plan["schema_version"], "1.0")
+        self.assertEqual(plan["kind"], "source_upgrade_review_plan")
+        self.assertTrue({"repository_id", "old_commit", "proposed_commit", "decision",
+                         "selected_modules", "fallback_reasons", "input_snapshot",
+                         "review_scope_metrics", "execution_gate", "plan_sha256"} <= set(plan))
+        self.assertRegex(plan["plan_sha256"], r"^[0-9a-f]{64}$")
+        self.assertEqual(plan["selected_modules"], sorted(set(plan["selected_modules"])))
+        self.assertIsInstance(plan["input_snapshot"]["knowledge_worktree_dirty"], bool)
+        self.assertRegex(plan["input_snapshot"]["knowledge_git_head"], r"^(?:[0-9a-f]{40}|[0-9a-f]{64})$")
+        for key in ("config_sha256", "source_tree_sha256", "relations_sha256",
+                    "approval_manifests_sha256", "runtime_evidence_tree_sha256"):
+            self.assertRegex(plan["input_snapshot"][key], r"^[0-9a-f]{64}$")
+        for key in ("modules_total", "semantic_review_modules", "baseline_touch_modules",
+                    "approval_refresh_modules"):
+            value = plan["review_scope_metrics"][key]
+            self.assertIs(type(value), int)
+            self.assertGreaterEqual(value, 0)
+        self.assertEqual(plan["decision"], "selected_modules")
+        self.assertEqual(plan["selected_modules"], ["example.order.query"])
+        self.assertEqual(plan["execution_gate"], "baseline_migration_and_explicit_review_required")
+        self.assertEqual(plan["plan_sha256"], json.loads(self.example.run_cli(
+            "preview-upgrade", "--all-modules", "--plan", *args).stdout)["plan_sha256"])
+        accepted = self.example.run_cli("preview-upgrade", "--all-modules", "--plan",
+                                        "--expect-plan-sha256", plan["plan_sha256"], *args)
+        self.assertEqual(accepted.returncode, 0, accepted.stderr)
+        empty_digest = self.example.run_cli("preview-upgrade", "--all-modules", "--plan",
+                                            "--expect-plan-sha256", "", *args)
+        self.assertNotEqual(empty_digest.returncode, 0)
+        self.assertIn("已过期", empty_digest.stderr)
+        config_path = self.example.project / "知识库配置.json"
+        config_path.write_bytes(old_config + b"\n")
+        stale_inputs = self.example.run_cli("preview-upgrade", "--all-modules", "--plan",
+                                            "--expect-plan-sha256", plan["plan_sha256"], *args)
+        self.assertNotEqual(stale_inputs.returncode, 0)
+        self.assertIn("已过期", stale_inputs.stderr)
+        config_path.write_bytes(old_config)
+        self.assertEqual((self.example.project / "知识库配置.json").read_bytes(), old_config)
+        invalid = self.example.run_cli("preview-upgrade", "--module-id", "example.order.query", "--plan", *args)
+        self.assertNotEqual(invalid.returncode, 0)
+        invalid_empty = self.example.run_cli("preview-upgrade", "--module-id", "example.order.query",
+                                              "--expect-plan-sha256", "", *args)
+        self.assertNotEqual(invalid_empty.returncode, 0)
+        (repo / "unmapped.txt").write_text("new external behavior\n", encoding="utf-8")
+        subprocess.run(["git", "-C", str(repo), "add", "unmapped.txt"], check=True)
+        subprocess.run(["git", "-C", str(repo), "-c", "user.name=Fixture",
+                        "-c", "user.email=fixture@example.invalid", "commit", "-q", "-m", "unmapped path"], check=True)
+        unknown_commit = subprocess.check_output(["git", "-C", str(repo), "rev-parse", "HEAD"], text=True).strip()
+        unknown = self.example.run_cli("preview-upgrade", "--all-modules", "--plan", "--repository-id", "backend",
+                                       "--new-commit", unknown_commit)
+        self.assertEqual(unknown.returncode, 0, unknown.stderr)
+        self.assertEqual(json.loads(unknown.stdout)["decision"], "full_project_review")
+        self.assertIn("unattributed_changed_paths", json.loads(unknown.stdout)["fallback_reasons"])
+        self.assertIn("added_deleted_or_type_changed_path", json.loads(unknown.stdout)["fallback_reasons"])
+        stale = self.example.run_cli("preview-upgrade", "--all-modules", "--plan",
+                                     "--expect-plan-sha256", plan["plan_sha256"], "--repository-id", "backend",
+                                     "--new-commit", unknown_commit)
+        self.assertNotEqual(stale.returncode, 0)
+        self.assertIn("已过期", stale.stderr)
+
     def approve_mapping(self) -> None:
         self.save()
         impact = self.example.run_cli("impact", "--module-id", "example.order.query")

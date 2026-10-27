@@ -42,7 +42,15 @@ class PetclinicPublicSourceTests(unittest.TestCase):
         revisions = {}
         for role in ("frontend", "backend"):
             repo = self.root / f"petclinic-{role}"
-            shutil.copytree(PUBLIC / role, repo)
+            # Keep the original four-file retrieval run reproducible even when
+            # other public-source cases add more files beside this fixture.
+            repo.mkdir()
+            for relative in EXPECTED:
+                if not relative.startswith(f"{role}/"):
+                    continue
+                destination = repo / relative.removeprefix(f"{role}/")
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(PUBLIC / relative, destination)
             subprocess.run(["git", "init", "-q", str(repo)], check=True)
             subprocess.run(["git", "-C", str(repo), "add", "."], check=True)
             subprocess.run(["git", "-C", str(repo), "-c", "user.name=Public Fixture", "-c", "user.email=public@example.invalid", "commit", "-q", "-m", "preserve public source files"], check=True, env=fixed_git_environment)
@@ -202,6 +210,9 @@ class PetclinicPublicSourceTests(unittest.TestCase):
         self.assertEqual(fts["queries"][2]["ranking"], [])
         self.assertEqual(self.run_cli("retrieval-audit", "--release-id", "petclinic-public-v1").returncode, 0)
         old_commit = revisions["backend"]["commit"]
+        recorded_commits = json.loads((PUBLIC / "fts5-run.json").read_text(encoding="utf-8"))["fixed_source_commits"]
+        self.assertEqual(recorded_commits, {"frontend": revisions["frontend"]["commit"],
+                                            "backend_first": old_commit, "backend_second": next_commit})
         config["repositories"]["backend"]["commit"] = next_commit
         fixture.write(config_path, json.dumps(config, ensure_ascii=False))
         for path in self.source.rglob("*.md"):

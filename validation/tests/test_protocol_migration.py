@@ -103,6 +103,20 @@ class ProtocolMigrationTests(unittest.TestCase):
         self.assertNotEqual(invalid.returncode, 0)
         self.assertIn("intent_included", invalid.stderr)
 
+    def test_repository_url_guard_applies_to_both_source_protocols(self) -> None:
+        overview = self.module / "模块概览.md"
+        fixture.write(overview, overview.read_text(encoding="utf-8") +
+                      "\n[参考](https://github.com/example/repo/blob/abc1234/README.md#L3)\n")
+        for standard_version in (core.STANDARD_VERSION, core.LEGACY_STANDARD_VERSION):
+            with self.subTest(standard_version=standard_version):
+                config_path = self.project / "知识库配置.json"
+                config = json.loads(config_path.read_text(encoding="utf-8"))
+                config["standard_version"] = standard_version
+                fixture.write(config_path, json.dumps(config, ensure_ascii=False))
+                result = self.run_cli("check")
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("业务文件含源码仓库链接", result.stderr)
+
     def test_legacy_release_then_migrate_then_new_release(self) -> None:
         self.legacy_config()
         fixture.finalize_fixture(self.project, "example.order.query")

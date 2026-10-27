@@ -1,0 +1,53 @@
+{
+  "schema_version": "0.1",
+  "upstream_repository": "spring-petclinic/spring-petclinic-rest",
+  "upstream_commit": "afc8fc1d3b8ec8de69414482b3bd70a1da78cb95",
+  "controlled_change": "OwnerRestControllerV1.listOwners: blank lastName takes the all-owner branch",
+  "modules": [
+    {
+      "module_id": "petclinic.owner.search",
+      "file": "OwnerRestControllerV1.java",
+      "line_span": "76-87",
+      "original_sha256": "19291723b9b2f6545595f098116cbf3fd5ee5676aa55ae20f8079b51b5b2d883",
+      "base_answer": "姓氏只要不是 null 就进入按姓氏查询分支；空白姓氏也进入该分支。",
+      "target_answer": "姓氏不是 null 且非空白时才按姓氏查询；空白姓氏进入查询全部主人的分支。",
+      "must_reinterpret": true
+    },
+    {
+      "module_id": "petclinic.pet.list",
+      "file": "PetRestControllerV1.java",
+      "line_span": "64-71",
+      "original_sha256": "e541bd39d7063bdc51254cb436b2d66bedfa560528d1e31fed9644984fb6e299",
+      "base_answer": "宠物列表为空时返回 NOT_FOUND。",
+      "target_answer": "宠物列表为空时返回 NOT_FOUND。",
+      "must_reinterpret": false
+    },
+    {
+      "module_id": "petclinic.visit.detail",
+      "file": "VisitRestControllerV1.java",
+      "line_span": "67-74",
+      "original_sha256": "d4081e597429d71ee503c9ecc83fac8f086b238ec8c0e4110e239e7aeb26018a",
+      "base_answer": "查不到指定就诊记录时返回 NOT_FOUND。",
+      "target_answer": "查不到指定就诊记录时返回 NOT_FOUND。",
+      "must_reinterpret": false
+    },
+    {
+      "module_id": "petclinic.vet.list",
+      "file": "VetRestControllerV1.java",
+      "line_span": "58-65",
+      "original_sha256": "a8d452ddad26b93dc830997c8ef84a478ad2c5b45c07b510bdc1de8939e29eed",
+      "base_answer": "兽医列表为空时返回 NOT_FOUND。",
+      "target_answer": "兽医列表为空时返回 NOT_FOUND。",
+      "must_reinterpret": false
+    },
+    {
+      "module_id": "petclinic.specialty.list",
+      "file": "SpecialtyRestControllerV1.java",
+      "line_span": "55-64",
+      "original_sha256": "afe529480a43b9075bcb32645a032abc07835b8d10da952a329a54a073a7974d",
+      "base_answer": "专科列表为空时返回 NOT_FOUND。",
+      "target_answer": "专科列表为空时返回 NOT_FOUND。",
+      "must_reinterpret": false
+    }
+  ]
+}

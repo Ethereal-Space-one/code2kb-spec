@@ -4,7 +4,7 @@
 
 Code2KB Spec 从固定源码提交提取有证据的业务行为与代码逻辑，建立可追溯、可审核、可发布、适合检索的知识库，并提供开放规范、Python 参考实现、AI Agent Skill、模板和技术栈适配器。代码不能单独证明业务政策原因或线上运行结果；未知边界须随知识保留。
 
-> 当前工程版本：`0.8.0`。知识文件协议的兼容标识见[版本管理](docs/versioning.md)，不与任何使用本工具的知识库项目同步编号。
+> 当前工程版本：`1.0.0`。知识文件协议的兼容标识见[版本管理](docs/versioning.md)，不与任何使用本工具的知识库项目同步编号。
 
 ## 三层结构
 
@@ -97,6 +97,10 @@ code2kb check --project-root /path/to/knowledge-project
 
 可选检索扩展保守保留跨节条件和未知、合并同模块的泛标题，并提供术语表遗漏与整篇保留诊断。新增只读的[全项目源码升级预览](docs/source-upgrade-preview.md)：比较旧、新固定提交，标出证据变化、事实与主题、可定位的检索单元以及无法归属的路径。公开 PetClinic 样本用两个受控提交和实际 SQLite FTS5 跑通改变答案后的定位与召回；结果只证明小样本证据可召回，不代表最终模型回答或线上行为已验证。[检索导入边界](docs/retrieval-contract.md)保持独立快照切换，默认双版发布和知识文件协议不变。
 
+## 1.0.0 新增能力
+
+`preview-upgrade --all-modules --plan` 为源码升级生成绑定输入摘要的[只读复核计划](docs/1.0.0-public-contract.md)：区分需要重新解释业务语义的模块、全局基线触及和需刷新审核的包。计划过期或覆盖不明时拒绝或回退全项目；它不自动改写知识、迁移证据、创建任务、批准或发布。公开五模块案例显示语义复核候选为 1/5，但基线与审核工作仍为 5/5，因此不宣称自动增量执行有净收益。业务版新发布会拒绝明确的源码仓库链接；旧发布可按原规则继续审计。
+
 ## 能力边界
 
 本项目能检查结构、固定锚点、摘要、发布隔离和治理记录。它不能自动证明：
@@ -122,7 +126,7 @@ code2kb check --project-root /path/to/knowledge-project
 └── docs/                          # 教程和实现说明
 ```
 
-版本规则见[版本管理](docs/versioning.md)，升级关系见[兼容性说明](docs/compatibility.md)，本版实施边界见[0.8.0 发布规划](docs/0.8.0-implementation-plan.md)，后续方向见 [ROADMAP](ROADMAP.md)。
+版本规则见[版本管理](docs/versioning.md)，升级关系见[兼容性说明](docs/compatibility.md)，本版实施边界见[1.0.0 实施规划](docs/1.0.0-implementation-plan.md)，后续方向见 [ROADMAP](ROADMAP.md)。
 
 ## 参与贡献
 

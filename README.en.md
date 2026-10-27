@@ -4,7 +4,7 @@
 
 Code2KB Spec extracts evidence-backed business behavior and code logic from fixed source revisions into traceable, reviewable, publishable, and retrievable knowledge bases. The repository also provides a Python reference implementation, an AI agent skill, templates, and stack adapters. Source code alone cannot prove business-policy intent or live behavior; uncertainty remains part of the knowledge.
 
-> Current project version: `0.8.0`. The knowledge file protocol has its own compatibility identifier; it does not follow the version of any project using this tool.
+> Current project version: `1.0.0`. The knowledge file protocol has its own compatibility identifier; it does not follow the version of any project using this tool.
 
 ## Three layers
 
@@ -63,6 +63,10 @@ New projects default to the independent `c2kb-file/1` file protocol identifier. 
 ## What's new in 0.8.0
 
 The optional retrieval view conservatively retains conditions and unknowns that span sections, merges generic headings within a module, and reports omitted glossaries and whole-source units needing review. A read-only [project-wide source-upgrade preview](docs/source-upgrade-preview.md) compares fixed Git commits and locates changed evidence, facts, topics, available retrieval units, and unattributed paths. A controlled two-commit PetClinic sample runs actual SQLite FTS5 over generated units; it establishes narrow retrieval evidence, not final model-answer or production correctness. The [retrieval import contract](docs/retrieval-contract.md) describes staged snapshot replacement. Default two-view publishing and the knowledge file protocol remain unchanged.
+
+## What's new in 1.0.0
+
+`preview-upgrade --all-modules --plan` produces a [read-only review plan](docs/1.0.0-public-contract.md) bound to its inputs. It separates modules needing semantic review from modules whose source baseline and approvals must be refreshed. Stale or insufficiently covered plans fail or fall back to full-project review. The plan does not migrate evidence, create tasks, approve, or publish. In a five-module public sample, one module needs semantic reinterpretation while all five still need baseline and approval work; no net automation benefit is claimed. New business releases reject clear source-repository URLs, while historical releases remain auditable under their original rule.
 
 ## Boundaries
 

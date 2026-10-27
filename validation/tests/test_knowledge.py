@@ -21,6 +21,14 @@ def write(path: Path, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
+def init_fixture_repo(path: Path) -> None:
+    subprocess.run(["git", "init", "-q", str(path)], check=True)
+    # Git may start automatic maintenance after a fixture commit. Keep it from
+    # writing to the temporary repository while unittest removes that directory.
+    for key, value in (("maintenance.auto", "false"), ("gc.auto", "0")):
+        subprocess.run(["git", "-C", str(path), "config", "--local", key, value], check=True)
+
+
 def doc(doc_type: str, body: str, *, reviewed: bool = False, extra: str = "") -> str:
     approval = "reviewed_by: example-reviewer\nreviewed_at: 2026-10-12\n" if reviewed else ""
     state = "reviewed" if reviewed else "draft"
@@ -68,7 +76,7 @@ def finalize_fixture(project: Path, module_id: str) -> None:
         result = subprocess.run([sys.executable, str(SCRIPT), *command, "--project-root", str(project)], text=True, capture_output=True)
         if result.returncode:
             raise AssertionError(result.stderr)
-    subprocess.run(["git", "init", "-q", str(project)], check=True)
+    init_fixture_repo(project)
     subprocess.run(["git", "-C", str(project), "add", "."], check=True)
     subprocess.run(["git", "-C", str(project), "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-q", "--allow-empty", "-m", "test approval"], check=True)
 
@@ -86,7 +94,7 @@ class KnowledgeTests(unittest.TestCase):
         for role in ("frontend", "backend"):
             repo = self.root / role
             repo.mkdir()
-            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            init_fixture_repo(repo)
             write(repo / "dummy.txt", role)
             if role == "frontend":
                 write(repo / "src/pages.json", json.dumps({"pages": [{"path": "pages/home/home"}], "subPackages": [{"root": "pages_order", "pages": [{"path": "order/order"}]}]}, ensure_ascii=False))
@@ -171,6 +179,35 @@ class KnowledgeTests(unittest.TestCase):
             capture_output=True,
             env=env,
         )
+
+    def test_business_source_rejects_repository_url_without_technical_label(self):
+        overview = self.module / "模块概览.md"
+        write(overview, overview.read_text(encoding="utf-8") + "\n[参考](https://github.com/example/repo/blob/abc1234/README.md#L3)\n")
+        result = self.run_cli("check")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("业务文件含源码仓库链接", result.stderr)
+
+    def test_business_source_rejects_private_branch_url_on_check_and_publish(self):
+        overview = self.module / "模块概览.md"
+        write(overview, overview.read_text(encoding="utf-8") + "\n[参考](https://git.example.com/team/repo/blob/main/src/file.py)\n")
+        for action in ("check", "publish"):
+            with self.subTest(action=action):
+                result = self.run_cli(action, *(["--release-id", "private-branch"] if action == "publish" else []))
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("业务文件含源码仓库链接", result.stderr)
+
+    def test_business_source_rejects_character_reference_in_repository_url(self):
+        overview = self.module / "模块概览.md"
+        write(overview, overview.read_text(encoding="utf-8") + "\n[参考](https://github.com/example&#47;repo)\n")
+        result = self.run_cli("check")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("业务文件含源码仓库链接", result.stderr)
+
+    def test_business_source_allows_ordinary_web_url(self):
+        overview = self.module / "模块概览.md"
+        write(overview, overview.read_text(encoding="utf-8") + "\n[帮助](https://example.invalid/help/orders)\n")
+        docs, _ = core.read_documents(self.source)
+        self.assertTrue(any(doc.relative.name == "模块概览.md" for doc in docs))
 
     def use_environment_repository_paths(self) -> dict[str, str]:
         config_path = self.project / "知识库配置.json"

@@ -64,11 +64,19 @@ def digest(value: str | bytes) -> str:
     return hashlib.sha256(value.encode("utf-8") if isinstance(value, str) else value).hexdigest()
 
 
-def scan_business_terms(core, text: str, where: str) -> None:
+def scan_business_terms(core, text: str, where: str, *, source_urls: bool = True) -> None:
     """业务版生成文本不得出现过程用语、内部编号或实现术语（研发版不受此限）。"""
     for number, line in enumerate(text.split("\n"), 1):
         if core.TECHNICAL.search(line) or core.BUSINESS_FORBIDDEN.search(line):
             raise ValueError(f"业务版生成内容含禁用表述（{where}:{number}）：{line.strip()[:80]}；请修正发布清单主题或发布信息边界文案后重试")
+        if source_urls and core.contains_source_repository_url(line):
+            raise ValueError(f"业务版生成内容含源码仓库链接（{where}:{number}）；请移至研发专属内容")
+
+
+def release_checks_source_urls(version: str) -> bool:
+    """New releases enforce the URL rule; older frozen releases keep their rules."""
+    match = re.fullmatch(r"([0-9]+)\.([0-9]+)\.([0-9]+)", version)
+    return not match or tuple(int(part) for part in match.groups()) >= (1, 0, 0)
 
 
 def content_digest(original: str) -> str:
@@ -699,7 +707,7 @@ class Governance:
             value = manifest.meta.get(key, "")
             if not value or any(char in value for char in "\n\r|"):
                 raise ValueError(f"发布清单缺少有效的 {key}")
-            if key.startswith("business_") and (self.core.TECHNICAL.search(value) or self.core.BUSINESS_FORBIDDEN.search(value)):
+            if key.startswith("business_") and (self.core.TECHNICAL.search(value) or self.core.BUSINESS_FORBIDDEN.search(value) or self.core.contains_source_repository_url(value)):
                 raise ValueError(f"发布清单须有业务语言的 {key}（不得含过程用语或内部编号）")
         return result
 
@@ -724,7 +732,7 @@ class Governance:
         prospective = [replace(doc, meta={**doc.meta, "review_status": "reviewed" if doc.relative in chosen else "draft"}) if doc.module_id == module_id and doc.doc_type in self.core.BUSINESS | self.core.ENGINEERING else doc for doc in self.docs]
         self.core.validate_project(prospective, self.outline, self.config, self.core.registered_adapter_entries(self.config))
         for value in (business_topics, business_unknowns, business_keywords):
-            if not value or any(char in value for char in "\n\r|") or self.core.TECHNICAL.search(value) or self.core.BUSINESS_FORBIDDEN.search(value):
+            if not value or any(char in value for char in "\n\r|") or self.core.TECHNICAL.search(value) or self.core.BUSINESS_FORBIDDEN.search(value) or self.core.contains_source_repository_url(value):
                 raise ValueError("业务主题、未知和关键词须为单行业务语言，且不得含过程用语或内部编号")
         engineering_topics = engineering_topics or business_topics
         engineering_unknowns = engineering_unknowns or business_unknowns
@@ -1082,8 +1090,9 @@ class Governance:
             registry_local = current.get("registry_path")
             if registry_local is not None and registry_local != path.relative_to(self.project).as_posix():
                 raise ValueError("当前版本指向的版本清单路径无效")
+        source_urls = release_checks_source_urls(generated_by["version"])
         for audience, view in value["views"].items():
-            self.core.validate_bundle(self.view_path(view["path"]), audience == "engineering")
+            self.core.validate_bundle(self.view_path(view["path"]), audience == "engineering", source_urls=source_urls)
         return value
 
     def current_pointer(self, release_id, value, registry_sha256):

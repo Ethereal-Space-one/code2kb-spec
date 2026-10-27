@@ -16,3 +16,11 @@ code2kb preview-upgrade --project-root /知识项目 \
 `fallback` 只有 `none_observed`、`module_review`、`full_project_review` 三种建议。`none_observed` 仅表示当前映射没有观察到需要排队的变化，仍受 `coverage`、显式排除和外部服务边界限制。图谱未关联的路径不会因 `must_review_facts` 为空而放行。
 
 该预览只回答“下一步核查哪里”。维护者确认后，仍须修订规格和正文，再执行既有 `impact`、`confirm-claims`、`prepare`、批准、发布与审计。旧命令 `preview-upgrade --module-id ...` 的返回结构与含义保持不变。
+
+## 1.0 只读复核候选计划
+
+全项目模式可显式附加 `--plan`；不附加时仍返回上述 0.2 预览。计划使用独立的 `schema_version: 1.0`，记录旧、新源码提交、知识项目 Git 提交、配置、知识源、关系映射、发布清单及当前发布指针的摘要，并逐路径给出归属和回退原因。`baseline_migration` 另列全局配置与大纲、各模块固定提交文件、关系证据、待重审正文和发布清单的候选修改范围；即使模块不需重新解释业务语义，也可能出现在这张迁移表中。`review_scope_metrics` 分开计数语义复核、基线迁移和重新审核的模块数，不把它们混作同一项节省。相同输入产生相同 `plan_sha256`。
+
+保存计划摘要后，可在同一全项目命令中传入 `--expect-plan-sha256 <摘要>` 复算；知识项目文件或目标源码提交发生变化时拒绝沿用旧计划。该核对仍为只读，不表示已经授权迁移或发布。
+
+工作区有未提交改动、新增/删除/类型变化路径、变化路径未归属、显式排除、Adapter 无法解析、关系未证实、变化缺少已验证证据，或存在绑定目标仓库旧提交的运行/部署证据时，计划给出 `full_project_review`。相关运行证据路径单独列入 `baseline_migration.runtime_evidence_requiring_independent_review`；旧观测不能机械改写为新提交的证据。满足当前归属条件时也仅给 `selected_modules` 候选；`execution_gate` 明确要求先解决固定提交和证据迁移，并重新走审核。`--plan` 不创建任务、不修改知识项目，也不授权旧批准复用。公开双模块案例已验证只读选择与手工迁移可行；受控迁移和任务衔接仍待实现。

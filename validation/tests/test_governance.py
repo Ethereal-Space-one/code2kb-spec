@@ -518,6 +518,52 @@ class GovernanceTests(unittest.TestCase):
                 scan_business_terms(core, sample, "检索索引.md")
         scan_business_terms(core, "数据是否存在缓存或延迟；上传失败只在日志里记录", "检索索引.md")
 
+    def test_business_generated_navigation_rejects_repository_url(self):
+        from governance import scan_business_terms
+        with self.assertRaisesRegex(ValueError, "源码仓库链接"):
+            scan_business_terms(core, "[参考](https://github.com/example/repo/blob/abc1234/README.md#L3)", "目录.md")
+        with self.assertRaisesRegex(ValueError, "源码仓库链接"):
+            scan_business_terms(core, "[参考](https://github.com/example&#47;repo)", "目录.md")
+        scan_business_terms(core, "[帮助](https://example.invalid/help/orders)", "目录.md")
+        with self.assertRaisesRegex(ValueError, "禁用表述"):
+            scan_business_terms(core, "METHOD-001", "旧目录.md", source_urls=False)
+
+    def test_frozen_08_source_url_fixture_remains_auditable(self):
+        frozen = Path(__file__).resolve().parents[2] / "conformance/legacy-url-release"
+        result = subprocess.run(
+            [fixture.sys.executable, str(fixture.SCRIPT), "audit-release", "--project-root", str(frozen)],
+            text=True, capture_output=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(result.stdout)["generated_by"]["version"], "0.8.0")
+
+    def test_audit_source_url_rule_follows_generator_version(self):
+        # Start from a genuine frozen 0.8 release. A new 1.0 publish must not
+        # be relabeled as 0.8 merely to test the historical audit rule.
+        frozen = Path(__file__).resolve().parents[2] / "conformance/legacy-url-release"
+        candidate = self.root / "legacy-url-audit-copy"
+        shutil.copytree(frozen, candidate)
+        release = candidate / "发布"
+        legacy_audit = subprocess.run(
+            [fixture.sys.executable, str(fixture.SCRIPT), "audit-release", "--project-root", str(candidate)],
+            text=True, capture_output=True)
+        self.assertEqual(legacy_audit.returncode, 0, legacy_audit.stderr)
+
+        registry_path = release / "版本清单/v08-source-url.json"
+        registry = json.loads(registry_path.read_text(encoding="utf-8"))
+        pointer_path = release / "当前版本.json"
+        pointer = json.loads(pointer_path.read_text(encoding="utf-8"))
+        registry["generated_by"]["version"] = "1.0.0"
+        pointer["generated_by"]["version"] = "1.0.0"
+        write(registry_path, json.dumps(registry, ensure_ascii=False, indent=2) + "\n")
+        pointer["registry_sha256"] = core.digest(registry_path.read_bytes())
+        write(pointer_path, json.dumps(pointer, ensure_ascii=False, indent=2) + "\n")
+        current_audit = subprocess.run(
+            [fixture.sys.executable, str(fixture.SCRIPT), "audit-release", "--project-root", str(candidate)],
+            text=True, capture_output=True)
+        self.assertNotEqual(current_audit.returncode, 0)
+        self.assertIn("源码仓库链接", current_audit.stderr)
+
     def test_prepare_refuses_process_vocabulary_in_topics(self):
         result = self.run_cli("prepare", "--module-id", "example.order.query", "--business-topics", "用户操作", "--business-unknowns", "写入方法带事务注解且经同类自身代理调用", "--business-keywords", "操作", "--refresh")
         self.assertNotEqual(result.returncode, 0)
