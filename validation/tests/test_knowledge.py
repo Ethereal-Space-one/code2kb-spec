@@ -21,6 +21,14 @@ def write(path: Path, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
+def init_fixture_repo(path: Path) -> None:
+    subprocess.run(["git", "init", "-q", str(path)], check=True)
+    # Git may start automatic maintenance after a fixture commit. Keep it from
+    # writing to the temporary repository while unittest removes that directory.
+    for key, value in (("maintenance.auto", "false"), ("gc.auto", "0")):
+        subprocess.run(["git", "-C", str(path), "config", "--local", key, value], check=True)
+
+
 def doc(doc_type: str, body: str, *, reviewed: bool = False, extra: str = "") -> str:
     approval = "reviewed_by: example-reviewer\nreviewed_at: 2026-10-12\n" if reviewed else ""
     state = "reviewed" if reviewed else "draft"
@@ -68,7 +76,7 @@ def finalize_fixture(project: Path, module_id: str) -> None:
         result = subprocess.run([sys.executable, str(SCRIPT), *command, "--project-root", str(project)], text=True, capture_output=True)
         if result.returncode:
             raise AssertionError(result.stderr)
-    subprocess.run(["git", "init", "-q", str(project)], check=True)
+    init_fixture_repo(project)
     subprocess.run(["git", "-C", str(project), "add", "."], check=True)
     subprocess.run(["git", "-C", str(project), "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-q", "--allow-empty", "-m", "test approval"], check=True)
 
@@ -86,7 +94,7 @@ class KnowledgeTests(unittest.TestCase):
         for role in ("frontend", "backend"):
             repo = self.root / role
             repo.mkdir()
-            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            init_fixture_repo(repo)
             write(repo / "dummy.txt", role)
             if role == "frontend":
                 write(repo / "src/pages.json", json.dumps({"pages": [{"path": "pages/home/home"}], "subPackages": [{"root": "pages_order", "pages": [{"path": "order/order"}]}]}, ensure_ascii=False))
