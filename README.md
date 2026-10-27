@@ -2,6 +2,8 @@
 
 **简体中文** · [English](README.en.md)
 
+![Code2KB Spec：从固定源码提交到可审核的知识库](assets/readme/overview.svg)
+
 从固定源码提交建立**有证据、可审核、可发布**的业务与研发知识库。
 
 Code2KB Spec 提供知识文件规范、AI Agent Skill、模板和 Python 参考工具。AI 编码助手负责阅读源码与编写知识；参考工具负责检查文件、证据和发布状态。它适合需要追溯知识来源、维护多仓库应用知识的团队。
@@ -17,6 +19,17 @@ Code2KB Spec 提供知识文件规范、AI Agent Skill、模板和 Python 参考
 | 可选检索扩展 | 按主题组织的检索单元及独立审计信息 |
 
 源码升级时，1.0.0 还可生成[只读复核计划](docs/1.0.0-public-contract.md)，帮助定位需重新解释的知识；它不会自动改写知识或批准发布。
+
+<details>
+<summary>查看证据链与双版发布示意</summary>
+
+以下两张图用示例数据解释结构，图中的代码和事实编号不是实际项目产物。
+
+![从固定源码锚点记录可核对的结构化事实](assets/readme/evidence.svg)
+
+![同一业务知识分别进入业务版与研发版](assets/readme/two-views.svg)
+
+</details>
 
 ## 快速体验
 
