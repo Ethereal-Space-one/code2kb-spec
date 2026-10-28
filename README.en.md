@@ -21,13 +21,26 @@ Code2KB Spec provides a knowledge-file specification, an AI agent skill, templat
 For source upgrades, 1.0.0 can also produce a [read-only review plan](docs/1.0.0-public-contract.md) to locate knowledge that may need reinterpretation. It does not rewrite knowledge or approve releases.
 
 <details>
-<summary>View the evidence and two-view release diagrams</summary>
+<summary>View source evidence and two-view knowledge diagrams (3)</summary>
 
-These diagrams use illustrative code and fact IDs; their examples are not project output. The diagrams have Chinese labels with English subtitles.
+Code, filenames, and fact IDs in these diagrams are illustrative. The diagrams have Chinese labels with English subtitles.
+
+![Inventory entry points from pinned source; adapters produce review candidates only](assets/readme/source-adapters.svg)
 
 ![Trace a structured fact back to a pinned source anchor](assets/readme/evidence.svg)
 
 ![Publish shared business knowledge in separate business and engineering views](assets/readme/two-views.svg)
+
+</details>
+
+<details>
+<summary>View optional retrieval and source-upgrade review diagrams (2)</summary>
+
+The retrieval extension uses reviewed release knowledge. The upgrade plan is read-only and does not migrate or approve content.
+
+![Create optional topic-sized retrieval units from audited releases](assets/readme/retrieval.svg)
+
+![Compare pinned source revisions to produce a read-only upgrade review plan](assets/readme/upgrade-review.svg)
 
 </details>
 
