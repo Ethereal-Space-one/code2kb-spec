@@ -21,13 +21,26 @@ Code2KB Spec 提供知识文件规范、AI Agent Skill、模板和 Python 参考
 源码升级时，1.0.0 还可生成[只读复核计划](docs/1.0.0-public-contract.md)，帮助定位需重新解释的知识；它不会自动改写知识或批准发布。
 
 <details>
-<summary>查看证据链与双版发布示意</summary>
+<summary>查看源码取证与双版知识示意（3 张）</summary>
 
-以下两张图用示例数据解释结构，图中的代码和事实编号不是实际项目产物。
+图中的代码、文件名和事实编号仅用于说明结构。
+
+![固定源码提交后盘点入口，适配器只输出待复核候选](assets/readme/source-adapters.svg)
 
 ![从固定源码锚点记录可核对的结构化事实](assets/readme/evidence.svg)
 
 ![同一业务知识分别进入业务版与研发版](assets/readme/two-views.svg)
+
+</details>
+
+<details>
+<summary>查看可选检索与源码升级复核示意（2 张）</summary>
+
+检索扩展只处理已审核的发布知识；升级计划只读，不自动迁移或批准。
+
+![从已审计的发布版生成按主题组织的可选检索单元](assets/readme/retrieval.svg)
+
+![比较固定源码提交并生成只读升级复核计划](assets/readme/upgrade-review.svg)
 
 </details>
 
