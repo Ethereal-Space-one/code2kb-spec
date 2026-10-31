@@ -69,7 +69,7 @@ class GovernanceTests(unittest.TestCase):
 
     def policy_record(self, subject, **overrides):
         record = {
-            "schema_version": "1.0",
+            "schema_version": "1.1",
             "run_id": "weekly-test-001",
             "module_id": "example.order.query",
             "policy_id": "test-policy-v1",
@@ -230,14 +230,83 @@ class GovernanceTests(unittest.TestCase):
         self.enable_policy(required_checks=required)
         subject = self.prepare_policy_candidate()
         checks = [{"check_id": check, "status": "passed", "report_sha256": core.digest(check)} for check in required]
-        path = self.policy_record(subject, checks=checks)
+        path = self.policy_record(subject, schema_version="1.0", checks=checks)
         result = self.run_cli("policy-review", "--module-id", "example.order.query", "--evidence-file", path.relative_to(self.project).as_posix(), "--executed-by", "ci-bot")
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("外部检查报告", result.stderr)
-        report = [{"name": "external.security_scan", "result": "passed", "sha256": core.digest("external.security_scan")}]
-        path = self.policy_record(subject, checks=checks, external_reports=report)
+        self.assertIn("1.1 记录", result.stderr)
+        report_path = self.project / "自动审核报告/security-scan.json"
+        report_body = '{"result":"passed"}\n'
+        write(report_path, report_body)
+        report_sha = core.digest(report_body)
+        next(item for item in checks if item["check_id"] == "external.security_scan")["report_sha256"] = report_sha
+        report = [{"name": "external.security_scan", "result": "passed", "sha256": report_sha, "path": "自动审核报告/security-scan.json"}]
+        path = self.policy_record(subject, schema_version="1.1", checks=checks, external_reports=report)
+        self.commit_project("记录外部审核报告")
         result = self.run_cli("policy-review", "--module-id", "example.order.query", "--evidence-file", path.relative_to(self.project).as_posix(), "--executed-by", "ci-bot")
         self.assertEqual(result.returncode, 0, result.stderr)
+        self.commit_project("记录策略审核结果")
+        write(report_path, '{"result":"failed"}\n')
+        self.assertIn("Git HEAD 不一致", self.run_cli("check").stderr)
+        self.assertNotEqual(self.run_cli("publish", "--release-id", "external-report").returncode, 0)
+        write(report_path, report_body)
+        self.assertEqual(self.run_cli("publish", "--release-id", "external-report").returncode, 0)
+
+    def test_policy_review_rejects_uncommitted_or_changed_external_report(self):
+        required = sorted({"knowledge_check", "impact_clear", "qa_four_categories", "source_traceability", "cross_module_consistency", "sensitive_scan", "external.security_scan"})
+        self.enable_policy(required_checks=required)
+        subject = self.prepare_policy_candidate()
+        report_path = self.project / "自动审核报告/security-scan.json"
+        body = '{"result":"passed"}\n'
+        write(report_path, body)
+        sha = core.digest(body)
+        checks = [{"check_id": check, "status": "passed", "report_sha256": sha if check == "external.security_scan" else core.digest(check)} for check in required]
+        report = [{"name": "external.security_scan", "result": "passed", "sha256": sha, "path": "自动审核报告/security-scan.json"}]
+        record = self.policy_record(subject, schema_version="1.1", checks=checks, external_reports=report)
+        command = ("policy-review", "--module-id", "example.order.query", "--evidence-file", record.relative_to(self.project).as_posix(), "--executed-by", "ci-bot")
+        result = self.run_cli(*command)
+        self.assertIn("未提交", result.stderr)
+        self.commit_project("记录外部审核报告")
+        write(report_path, '{"result":"failed"}\n')
+        result = self.run_cli(*command)
+        self.assertIn("Git HEAD 不一致", result.stderr)
+        write(report_path, body)
+        report[0]["sha256"] = core.digest("wrong")
+        self.policy_record(subject, schema_version="1.1", checks=checks, external_reports=report)
+        result = self.run_cli(*command)
+        self.assertIn("内容摘要不匹配", result.stderr)
+
+    def test_new_policy_review_rejects_legacy_optional_external_report(self):
+        self.enable_policy()
+        subject = self.prepare_policy_candidate()
+        report = [{"name": "external.optional_scan", "result": "passed", "sha256": core.digest("unlocated")}]
+        path = self.policy_record(subject, schema_version="1.0", external_reports=report)
+        result = self.run_cli("policy-review", "--module-id", "example.order.query", "--evidence-file", path.relative_to(self.project).as_posix(), "--executed-by", "ci-bot")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("1.1 记录", result.stderr)
+        checks = json.loads(path.read_text(encoding="utf-8"))["checks"]
+        checks.append({"check_id": "external.optional_scan", "status": "passed", "report_sha256": core.digest("unlocated")})
+        self.policy_record(subject, schema_version="1.1", checks=checks, external_reports=[])
+        result = self.run_cli("policy-review", "--module-id", "example.order.query", "--evidence-file", path.relative_to(self.project).as_posix(), "--executed-by", "ci-bot")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("逐项对应", result.stderr)
+
+    def test_historical_record_1_0_remains_readable(self):
+        from governance import Governance
+
+        required = sorted({"knowledge_check", "impact_clear", "qa_four_categories", "source_traceability", "cross_module_consistency", "sensitive_scan", "external.security_scan"})
+        self.enable_policy(required_checks=required)
+        subject = self.prepare_policy_candidate()
+        checks = [{"check_id": check, "status": "passed", "report_sha256": core.digest(check)} for check in required]
+        report = [{"name": "external.security_scan", "result": "passed", "sha256": core.digest("external.security_scan")}]
+        path = self.policy_record(subject, schema_version="1.0", checks=checks, external_reports=report)
+        project = self.project.resolve()
+        source, config = core.read_config(project)
+        docs, outline = core.read_documents(source)
+        governance = Governance(project, source, config, docs, outline, core)
+        policy, _, _, authorized, expires = governance.read_policy()
+        record, _, _ = governance.read_review_record(path.relative_to(self.project).as_posix())
+        manifest = next(item for item in docs if item.doc_type == "release_manifest")
+        self.assertTrue(governance.validate_review_record("example.order.query", manifest, policy, record, "ci-bot", authorized, expires))
 
     def test_policy_review_rejects_wrong_types_and_external_digest_mismatch(self):
         self.enable_policy()
@@ -252,8 +321,11 @@ class GovernanceTests(unittest.TestCase):
         self.enable_policy(required_checks=required)
         subject = self.prepare_policy_candidate()
         checks = [{"check_id": check, "status": "passed", "report_sha256": core.digest(check)} for check in required]
-        report = [{"name": "external.security_scan", "result": "passed", "sha256": core.digest("different report")}]
-        path = self.policy_record(subject, checks=checks, external_reports=report)
+        report_body = '{"result":"passed"}\n'
+        write(self.project / "自动审核报告/security-scan.json", report_body)
+        self.commit_project("记录外部审核报告")
+        report = [{"name": "external.security_scan", "result": "passed", "sha256": core.digest(report_body), "path": "自动审核报告/security-scan.json"}]
+        path = self.policy_record(subject, schema_version="1.1", checks=checks, external_reports=report)
         result = self.run_cli("policy-review", "--module-id", "example.order.query", "--evidence-file", path.relative_to(self.project).as_posix(), "--executed-by", "ci-bot")
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("摘要与报告摘要不一致", result.stderr)
@@ -281,7 +353,7 @@ class GovernanceTests(unittest.TestCase):
         subject = self.prepare_policy_candidate()
         path = self.policy_record(subject)
         text = path.read_text(encoding="utf-8")
-        write(path, text.replace('"schema_version": "1.0",', '"schema_version": "1.0",\n  "schema_version": "1.0",', 1))
+        write(path, text.replace('"schema_version": "1.1",', '"schema_version": "1.1",\n  "schema_version": "1.1",', 1))
         result = self.run_cli("policy-review", "--module-id", "example.order.query", "--evidence-file", path.relative_to(self.project).as_posix(), "--executed-by", "ci-bot")
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("重复字段", result.stderr)
@@ -679,6 +751,7 @@ class GovernanceTests(unittest.TestCase):
         spec = replace_section(spec, "## 接口契约", "## 接口契约\n\n| api_id | 接口标识 | 调用方 | 服务入口 | 主处理方法 | 证据 |\n| --- | --- | --- | --- | --- | --- |\n")
         spec = replace_section(spec, "## 方法职责", "## 方法职责\n\n| method_id | 符号 | 职责 | 关键性 | 关联接口 | 源码锚点 |\n| --- | --- | --- | --- | --- | --- |\n")
         spec = replace_section(spec, "## 调用匹配", "## 调用匹配\n\n" + MATCH_HEADER + "\n| --- | --- | --- | --- | --- | --- |\n")
+        spec = spec.split("## 大纲覆盖核对\n", 1)[0]
         write(module / "结构化规格.md", spec)
         evidence = f"---\ndocument_type: runtime_evidence\nevidence_id: EVID-OTHER\nmodule_id: app.sales.order\nevidence_type: runtime\nenvironment: 旧测试\nobserved_at: 2020-01-01\nvalid_until: 2020-02-01\nfact_ids: FACT-OTHER\n{revision}---\n\n# 订单旧测试\n\n## 来源与方法\n\n测试。\n\n## 观察或确认结果\n\n测试结果。\n\n## 适用范围与不能证明的事项\n\n只限旧测试。\n\n## 脱敏说明\n\n无个人信息。\n"
         write(self.project / "运行证据/销售/订单/旧测试.md", evidence)

@@ -554,6 +554,39 @@ def validate_spec_facts(doc: Document, config: dict, cache: dict[tuple[str, str]
     return len(rows)
 
 
+def validate_entry_coverage(doc: Document, outline: Outline, *, required: bool = False) -> int:
+    """Account for discovered module entries without claiming inventory completeness."""
+    heading = "## 大纲覆盖核对"
+    header = "| entry_id | 处置 | fact_ids | 说明 |"
+    if heading not in doc.body.splitlines():
+        if required:
+            raise KnowledgeError(f"{doc.relative}: 新发布候选缺少 {heading} 逐入口处置表")
+        return 0  # Existing reviewed sources remain readable and auditable.
+    rows = table_rows(doc.body, heading, header)
+    expected = {entry[0] for entry in outline.entries if entry[3] == doc.module_id}
+    facts = {
+        row[0]: row[2]
+        for row in table_rows(doc.body, "## 入口与调用链", "| fact_id | 单一结论与条件 | 证据等级 | 固定提交锚点 | 影响的知识文件 |")
+    }
+    seen: set[str] = set()
+    for entry_id, disposition, fact_ids, reason in rows:
+        if entry_id not in expected or entry_id in seen:
+            raise KnowledgeError(f"{doc.relative}: 大纲入口处置 ID 未归属本模块或重复：{entry_id}")
+        if disposition == "已取证":
+            ids = id_list(fact_ids, re.compile(r"[A-Za-z][A-Za-z0-9-]+\Z"), f"{doc.relative}: {entry_id}")
+            if not ids or not any(facts.get(item) in {"CODE_VERIFIED", "RUN_VERIFIED", "BUSINESS_CONFIRMED"} for item in ids) or any(item not in facts for item in ids):
+                raise KnowledgeError(f"{doc.relative}: {entry_id} 已取证须引用本模块已验证的事实")
+        elif disposition in {"待核查", "范围外"}:
+            if fact_ids != "无" or not reason or reason in {"无", "UNKNOWN", "待确认"}:
+                raise KnowledgeError(f"{doc.relative}: {entry_id} {disposition}须写原因，fact_ids 填无")
+        else:
+            raise KnowledgeError(f"{doc.relative}: {entry_id} 处置无效：{disposition}")
+        seen.add(entry_id)
+    if seen != expected:
+        raise KnowledgeError(f"{doc.relative}: 大纲入口未逐项处置：{sorted(expected - seen)}")
+    return len(rows)
+
+
 def id_list(value: str, pattern: re.Pattern[str], context: str) -> list[str]:
     if value == "无":
         return []
@@ -842,7 +875,7 @@ def intent_counts(docs: list[Document], config: dict) -> dict[str, int]:
     return counts
 
 
-def validate_project(docs: list[Document], outline: Outline, config: dict, adapter_entries: set[str] | None, *, for_publish: bool = False) -> list[Document]:
+def validate_project(docs: list[Document], outline: Outline, config: dict, adapter_entries: set[str] | None, *, for_publish: bool = False, entry_coverage: bool = True) -> list[Document]:
     revisions = expected_revisions(config)
     if outline.meta.get("source_revisions") != revisions:
         raise KnowledgeError("功能大纲 source_revisions 与项目配置不一致")
@@ -891,6 +924,8 @@ def validate_project(docs: list[Document], outline: Outline, config: dict, adapt
         spec = specs[0]
         sources = document_revisions(spec, config)
         fact_count = validate_spec_facts(spec, config, cache, sources)
+        if entry_coverage:
+            validate_entry_coverage(spec, outline)
         fact_render.normalized_facts(spec, sys.modules[__name__])
         api_rows, method_rows, core_ids = validate_spec_catalog(spec, outline, config, cache, sources)
         validate_semantic_quality(spec, items, facts_by_module[module_id], config, cache, sources)
@@ -1426,7 +1461,7 @@ def _main() -> int:
         adapter_entries = registered_adapter_entries(config)
         preparing = args.action in {"impact", "confirm-claims", "prepare", "approve", "policy-review"}
         validation_docs = [replace(doc, meta={**doc.meta, "review_status": "draft"}) if preparing and doc.doc_type in BUSINESS | ENGINEERING else doc for doc in docs]
-        selected = validate_project(validation_docs, outline, config, adapter_entries, for_publish=args.action == "publish")
+        selected = validate_project(validation_docs, outline, config, adapter_entries, for_publish=args.action == "publish", entry_coverage=args.action != "impact")
         governance = Governance(project, source, config, docs, outline, sys.modules[__name__])
         audiences = governance.audiences()
         governance.read_evidence()

@@ -110,6 +110,8 @@ class UpgradeBaselineSpikeTests(unittest.TestCase):
                                             f'| FACT-001 | 满100个货币单位免配送费，否则收5个单位 | CODE_VERIFIED | {order_anchor} |')
                 if path.parent == account:
                     body = body.replace('example.order.query','sample.account.profile').replace('订单查询','资料查看')
+                    if path.name == '结构化规格.md':
+                        body = body.split('## 大纲覆盖核对\n', 1)[0]
                     body = body.replace('ENT-001','ENT-004')
                     body = body.replace('backend:dummy.txt:1',account_anchor)
                     if path.name == '结构化规格.md':

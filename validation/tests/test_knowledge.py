@@ -66,6 +66,14 @@ def finalize_fixture(project: Path, module_id: str) -> None:
         api_doc = module / "接口与调用.md"
         if api_doc.exists():
             write(api_doc, api_doc.read_text(encoding="utf-8") + matching)
+    spec_text = spec.read_text(encoding="utf-8")
+    fact_rows = core.table_rows(core.parse_frontmatter(spec)[1], "## 入口与调用链", "| fact_id | 单一结论与条件 | 证据等级 | 固定提交锚点 | 影响的知识文件 |")
+    verified = next((row[0] for row in fact_rows if row[2] in {"CODE_VERIFIED", "RUN_VERIFIED", "BUSINESS_CONFIRMED"}), None)
+    coverage = "## 大纲覆盖核对\n\n| entry_id | 处置 | fact_ids | 说明 |\n| --- | --- | --- | --- |\n"
+    for entry_id, _, _, owner, _, _ in entries:
+        if owner == module_id:
+            coverage += f"| {entry_id} | {'已取证' if verified else '待核查'} | {verified or '无'} | {'测试夹具已复核' if verified else '测试夹具待取证'} |\n"
+    write(spec, replace_section(spec_text, "## 大纲覆盖核对", coverage))
     files = [path.relative_to(module).as_posix() for path in module.rglob("*.md") if core.parse_frontmatter(path)[0].get("review_status") == "reviewed" and path.name in core.TYPES and core.TYPES[path.name] in core.BUSINESS | core.ENGINEERING]
     commands = [
         ["confirm-claims", "--module-id", module_id],
@@ -208,6 +216,34 @@ class KnowledgeTests(unittest.TestCase):
         write(overview, overview.read_text(encoding="utf-8") + "\n[帮助](https://example.invalid/help/orders)\n")
         docs, _ = core.read_documents(self.source)
         self.assertTrue(any(doc.relative.name == "模块概览.md" for doc in docs))
+
+    def test_new_candidate_requires_discovered_entry_coverage(self):
+        spec = self.module / "结构化规格.md"
+        original = spec.read_text(encoding="utf-8")
+        without_table = original.split("## 大纲覆盖核对\n", 1)[0]
+        write(spec, without_table)
+        result = self.run_cli("prepare", "--module-id", "example.order.query", "--refresh", "--business-topics", "查询", "--business-unknowns", "运行结果", "--business-keywords", "查询")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("逐入口处置表", result.stderr)
+
+    def test_entry_coverage_rejects_omission_and_unknown_fact(self):
+        spec = self.module / "结构化规格.md"
+        original = spec.read_text(encoding="utf-8")
+        write(spec, original.replace("| ENT-002 | 已取证 | FACT-001 | 测试夹具已复核 |\n", ""))
+        result = self.run_cli("check")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("大纲入口未逐项处置", result.stderr)
+        write(spec, original.replace("| ENT-002 | 已取证 | FACT-001 |", "| ENT-002 | 已取证 | FACT-999 |"))
+        result = self.run_cli("check")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("已取证须引用本模块已验证的事实", result.stderr)
+
+    def test_approve_cannot_skip_entry_coverage(self):
+        spec = self.module / "结构化规格.md"
+        write(spec, spec.read_text(encoding="utf-8").split("## 大纲覆盖核对\n", 1)[0])
+        result = self.run_cli("approve", "--module-id", "example.order.query", "--reviewed-by", "fixture-reviewer", "--reviewed-at", "2026-10-25", "--approval-note", "测试明确授权")
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("逐入口处置表", result.stderr)
 
     def use_environment_repository_paths(self) -> dict[str, str]:
         config_path = self.project / "知识库配置.json"
