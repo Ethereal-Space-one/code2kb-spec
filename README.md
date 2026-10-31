@@ -93,6 +93,8 @@ code2kb check --project-root /path/to/knowledge-project
 
 按模块完成影响复核、结论复核、候选准备及授权审核后，再发布并审计：
 
+**审批前选择方式**：人工审核用 `approve`，记录实际审核人的明确批准；自动审核用 `policy-review`，前提是项目已有有效的预授权策略和本次审核记录。策略不覆盖的模块或命中人工门禁的包，保持草稿并交人工审核。两种方式都按模块执行；AI 自检或 `check` 通过不会自动批准。
+
 ```bash
 code2kb publish --project-root /path/to/knowledge-project --release-id my-kb-v1
 code2kb audit-release --project-root /path/to/knowledge-project

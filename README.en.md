@@ -93,6 +93,8 @@ code2kb check --project-root /path/to/knowledge-project
 
 After module impact review, claim review, candidate preparation, and authorized approval, publish and audit:
 
+**Choose a review path before approval:** use `approve` for an explicit decision by a human reviewer; use `policy-review` only when the project has a valid, preauthorized policy and a review record for this candidate. A package outside the policy or caught by a manual gate stays in draft for human review. The choice is per module; an agent self-check or passing `check` never approves a package.
+
 ```bash
 code2kb publish --project-root /path/to/knowledge-project --release-id my-kb-v1
 code2kb audit-release --project-root /path/to/knowledge-project
