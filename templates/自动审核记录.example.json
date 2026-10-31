@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.0",
+  "schema_version": "1.1",
   "run_id": "weekly-20261018-001",
   "module_id": "example.module",
   "policy_id": "example-auto-review-v1",

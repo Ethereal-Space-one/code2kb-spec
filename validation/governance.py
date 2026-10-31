@@ -263,7 +263,7 @@ class Governance:
         return record, path, digest(raw)
 
     def validate_review_record(self, module_id, manifest, policy, record, executed_by, authorized, expires):
-        if record["schema_version"] != "1.0" or not isinstance(record["run_id"], str) or not RUN_ID.fullmatch(record["run_id"]):
+        if record["schema_version"] not in {"1.0", "1.1"} or not isinstance(record["run_id"], str) or not RUN_ID.fullmatch(record["run_id"]):
             raise ValueError("自动审核记录 schema_version 或 run_id 无效")
         if record["module_id"] != module_id or record["policy_id"] != policy["policy_id"] or record["policy_version"] != policy["policy_version"]:
             raise ValueError("自动审核记录的模块或策略版本不匹配")
@@ -310,16 +310,29 @@ class Governance:
         if not isinstance(reports, list):
             raise ValueError("自动审核记录 external_reports 须为数组")
         report_names = set()
+        report_paths = set()
         for item in reports:
-            if not isinstance(item, dict) or set(item) != {"name", "result", "sha256"} or not isinstance(item["name"], str) or not item["name"].startswith("external.") or not CHECK_ID.fullmatch(item["name"]) or item["name"] in report_names or item["result"] != "passed" or not SHA.fullmatch(item["sha256"] if isinstance(item["sha256"], str) else ""):
+            expected_fields = {"name", "result", "sha256", "path"} if record["schema_version"] == "1.1" else {"name", "result", "sha256"}
+            if not isinstance(item, dict) or set(item) != expected_fields or not isinstance(item["name"], str) or not item["name"].startswith("external.") or not CHECK_ID.fullmatch(item["name"]) or item["name"] in report_names or item["result"] != "passed" or not SHA.fullmatch(item["sha256"] if isinstance(item["sha256"], str) else ""):
                 raise ValueError("自动审核记录外部报告结构、结果或摘要无效")
+            if record["schema_version"] == "1.1":
+                path = self.project_json(item["path"], "自动审核报告", "自动审核报告")
+                self.git_head_matches(path, "自动审核报告")
+                if digest(path.read_bytes()) != item["sha256"]:
+                    raise ValueError(f"自动审核报告内容摘要不匹配：{item['path']}")
+                report_paths.add(path)
             report_names.add(item["name"])
         required_external = {item for item in policy["required_checks"] if item.startswith("external.")}
         if not required_external <= report_names:
             raise ValueError("自动审核记录缺少外部检查报告摘要")
+        declared_external = {item for item in found if item.startswith("external.")}
+        if record["schema_version"] == "1.1" and declared_external != report_names:
+            raise ValueError("自动审核记录的外部检查与报告文件须逐项对应")
         reports_by_name = {item["name"]: item for item in reports}
-        if any(found[name]["report_sha256"] != reports_by_name[name]["sha256"] for name in required_external):
+        compared = declared_external if record["schema_version"] == "1.1" else required_external
+        if any(found[name]["report_sha256"] != reports_by_name[name]["sha256"] for name in compared):
             raise ValueError("自动审核记录的外部检查摘要与报告摘要不一致")
+        self.scan_sensitive_files(report_paths)
         findings = record["findings"]
         if not isinstance(findings, list):
             raise ValueError("自动审核记录 findings 须为数组")
@@ -339,6 +352,7 @@ class Governance:
         if self.impacts(module_id):
             raise ValueError("模块存在待复核结论，不能策略审核")
         self.core.validate_qa(spec)
+        self.policy_inputs.update(report_paths)
         return completed_date.isoformat()
 
     def module_docs(self, module_id):
@@ -731,6 +745,7 @@ class Governance:
         chosen = {doc.relative for doc in candidates}
         prospective = [replace(doc, meta={**doc.meta, "review_status": "reviewed" if doc.relative in chosen else "draft"}) if doc.module_id == module_id and doc.doc_type in self.core.BUSINESS | self.core.ENGINEERING else doc for doc in self.docs]
         self.core.validate_project(prospective, self.outline, self.config, self.core.registered_adapter_entries(self.config))
+        self.core.validate_entry_coverage(spec, self.outline, required=True)
         for value in (business_topics, business_unknowns, business_keywords):
             if not value or any(char in value for char in "\n\r|") or self.core.TECHNICAL.search(value) or self.core.BUSINESS_FORBIDDEN.search(value) or self.core.contains_source_repository_url(value):
                 raise ValueError("业务主题、未知和关键词须为单行业务语言，且不得含过程用语或内部编号")
@@ -794,6 +809,7 @@ class Governance:
         manifest = next((doc for doc in self.module_docs(module_id) if doc.doc_type == "release_manifest"), None)
         if not manifest:
             raise ValueError("先 prepare 生成可审阅的模块发布清单")
+        self.core.validate_entry_coverage(self.spec(module_id), self.outline, required=True)
         rows = self.manifest_rows(manifest)
         if not any(doc.doc_type == "spec" for doc, heading in rows.values() if heading == "## 审核依据"):
             raise ValueError("发布清单缺少规格审核依据")
@@ -812,12 +828,15 @@ class Governance:
         manifest = next((doc for doc in self.module_docs(module_id) if doc.doc_type == "release_manifest"), None)
         if not manifest or manifest.meta.get("review_status") != "draft":
             raise ValueError("先 prepare 生成 draft 模块发布清单")
+        self.core.validate_entry_coverage(self.spec(module_id), self.outline, required=True)
         rows = self.manifest_rows(manifest)
         subject = manifest.meta.get("review_subject_digest")
         if not SHA.fullmatch(subject or "") or subject != review_subject_digest(manifest.original):
             raise ValueError("发布清单候选摘要缺失或已变化；重新 prepare")
         policy, policy_path, policy_sha, authorized, expires = self.read_policy(require_head=True)
         record, record_path, record_sha = self.read_review_record(evidence_file)
+        if record["schema_version"] == "1.0":
+            raise ValueError("新策略审核须使用 1.1 记录；旧 1.0 记录仅供历史复核")
         reviewed_at = self.validate_review_record(module_id, manifest, policy, record, executed_by, authorized, expires)
         candidate_paths = [self.source / doc.relative for doc, heading in rows.values() if heading == "## 发布文件"]
         self.scan_sensitive_files([*candidate_paths, policy_path, record_path])

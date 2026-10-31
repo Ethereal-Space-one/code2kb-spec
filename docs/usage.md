@@ -65,6 +65,8 @@ code2kb --version
 
 不创建空正文。业务证据只保存脱敏摘录和原始材料摘要，不复制敏感原文。
 
+为新候选执行 `prepare` 前，须在模块《结构化规格》的“大纲覆盖核对”表逐项处置归属本模块的已登记入口；已取证关联事实 ID，待核查或范围外写原因。旧发布的审计不受此要求影响。
+
 ## 常用命令
 
 ```bash
@@ -99,7 +101,7 @@ code2kb approve --project-root /项目 --module-id example.module \
   --approval-note '审核人确认的发布范围原文'
 ```
 
-启用预授权策略时，先把策略和审核记录提交到项目 Git，再执行：
+启用预授权策略时，使用 `1.1` 审核记录，先把策略和审核记录提交到项目 Git；若有 `external.*` 检查，还须把脱敏后的 JSON 报告放在项目 `自动审核报告/` 并提交。记录的 `external_reports` 中填写该报告的 `path`、`sha256`，同一检查的 `report_sha256` 必须一致。工具会复算报告原始字节摘要，但不会判断报告结论真假。历史 `1.0` 审核记录仍可核对，不能用于新增批准。随后执行：
 
 ```bash
 code2kb policy-review --project-root /项目 --module-id example.module \

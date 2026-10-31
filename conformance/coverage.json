@@ -65,6 +65,9 @@
     "C2KB-EVIDENCE-009": [
       "validation/tests/test_governance.py::GovernanceTests.test_evidence_change_invalidates_module_approval"
     ],
+    "C2KB-EVIDENCE-010": [
+      "validation/tests/test_knowledge.py::KnowledgeTests.test_entry_coverage_rejects_omission_and_unknown_fact"
+    ],
     "C2KB-EXT-001": [
       "validation/tests/test_knowledge.py::KnowledgeTests.test_registered_uniapp_page_cannot_be_omitted"
     ],
@@ -72,7 +75,8 @@
       "validation/tests/test_knowledge.py::KnowledgeTests.test_configured_inventory_manifest_must_exist"
     ],
     "C2KB-EXT-003": [
-      "validation/tests/test_knowledge.py::KnowledgeTests.test_registered_uniapp_page_cannot_be_omitted"
+      "validation/tests/test_governance.py::GovernanceTests.test_policy_review_requires_external_report_when_policy_requests_it",
+      "validation/tests/test_governance.py::GovernanceTests.test_policy_review_rejects_uncommitted_or_changed_external_report"
     ],
     "C2KB-EXT-004": [
       "validation/tests/test_knowledge.py::KnowledgeTests.test_php_java_profile_with_custom_repository_ids"
@@ -151,7 +155,8 @@
       "validation/tests/test_governance.py::GovernanceTests.test_policy_review_requires_enabled_committed_policy"
     ],
     "C2KB-REVIEW-004": [
-      "validation/tests/test_governance.py::GovernanceTests.test_policy_review_rejects_candidate_source_check_and_risk_mismatches"
+      "validation/tests/test_governance.py::GovernanceTests.test_policy_review_rejects_candidate_source_check_and_risk_mismatches",
+      "validation/tests/test_governance.py::GovernanceTests.test_policy_review_rejects_uncommitted_or_changed_external_report"
     ],
     "C2KB-REVIEW-005": [
       "validation/tests/test_governance.py::GovernanceTests.test_policy_review_rejects_expired_or_incomplete_policy"
